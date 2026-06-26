@@ -136,7 +136,7 @@
             <div id="chartWrap" style="position:relative">
                 <div id="chartContainer"></div>
                 <div id="priceLabels" style="position:absolute;top:0;right:0;pointer-events:none;z-index:10"></div>
-                <div id="timerLabel" style="position:absolute;top:0;right:0;pointer-events:none;z-index:10"></div>
+                <div id="timerLabel" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);pointer-events:none;z-index:10"></div>
             </div>
         </div>
 
@@ -172,7 +172,7 @@
         .signals-table tr { cursor: pointer; }
         .signals-table tr:hover td { background: var(--bg4); }
         .signals-table tr.selected td { background: rgba(59,130,246,0.15); }
-        .price-label { position: absolute; right: 0; font-size: 10px; font-family: 'SF Mono','Fira Code','Consolas',monospace; padding: 1px 5px; border-radius: 2px; white-space: nowrap; transform: translateY(-50%); font-weight: 600; }
+        .price-label { position: absolute; right: 10px; font-size: 10px; font-family: 'SF Mono','Fira Code','Consolas',monospace; padding: 1px 5px; border-radius: 2px; white-space: nowrap; transform: translateY(-50%); font-weight: 600; }
         .price-label.entry { background: rgba(255,255,255,0.15); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.3); }
         .price-label.tp { background: rgba(34,197,94,0.2); color: #22c55e; border: 1px solid rgba(34,197,94,0.4); }
         .price-label.sl { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); }
@@ -429,7 +429,8 @@
                 }
                 el.textContent = text;
                 el.style.display = '';
-                el.style.top = (y + chartRect.top - wrapRect.top) + 'px';
+                el.style.top = '0px';
+                el.style.transform = 'none';
             } catch(e) {}
         }
 
