@@ -35,6 +35,10 @@ class SignalEngine:
         if h4_regime < 0 and ml_pred == 1:
             return self._no_trade('h4_bearish_long_blocked')
 
+        ml_conf_for_gate = (1 - ml_confidence) if ml_pred == 0 else ml_confidence
+        if ml_conf_for_gate < 0.85:
+            return self._no_trade(f'low_ml_confidence_{ml_conf_for_gate:.2f}')
+
         from src.confidence_scorer import ConfidenceScorer
         scorer = ConfidenceScorer({'threshold': self.confidence_threshold})
         confidence, scores = scorer.score(features_row, raw_features_row)

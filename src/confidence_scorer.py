@@ -17,7 +17,7 @@ class ConfidenceScorer:
         })
         self.threshold = cfg.get('threshold', 80)
 
-    def score(self, row, raw_features=None):
+    def score(self, row, raw_features=None, ml_conf=None):
         feat = raw_features if raw_features is not None else row
 
         scores = {
@@ -31,7 +31,10 @@ class ConfidenceScorer:
             'spread': self._score_spread(feat),
         }
 
-        weighted = sum(scores[k] * self.weights[k] for k in scores)
+        if ml_conf is not None:
+            scores['ml'] = max(0, min(100, ml_conf * 100))
+
+        weighted = sum(scores[k] * self.weights[k] for k in scores if k in self.weights)
         return weighted, scores
 
     def score_batch(self, df, raw_features=None):
