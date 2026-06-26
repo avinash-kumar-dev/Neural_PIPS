@@ -17,7 +17,7 @@ from src.confidence_scorer import ConfidenceScorer
 from src.signal_engine import SignalEngine
 
 SIGNALS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'eurusd', 'live_signals.json')
-MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'v3_regime')
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'v4_retrained')
 
 running = True
 
@@ -121,43 +121,36 @@ def run_check(fetcher, engineer, pipeline, models, meta_model, scorer, engine):
 
     feat_row['time'] = m5_df['time'].iloc[-1]
 
-    ml_pred, ml_conf = engine._predict(feat_row, models, meta_model)
-    direction = 'LONG' if ml_pred == 1 else 'SHORT'
+    feat_series = pd.Series(feat_row)
+    raw_series = pd.Series(raw_row)
 
-    confidence, scores = scorer.score(feat_row, raw_row)
-    if confidence < engine.confidence_threshold:
-        return None, f'low_confidence_{confidence:.0f}'
+    engine_result = engine.generate_signal(feat_series, raw_series, models, meta_model)
 
-    atr_pips = raw_row.get('atr_pips', 10)
-    if atr_pips < engine.min_sl_pips:
-        return None, 'atr_too_low'
-
-    tp_pips = min(max(atr_pips * 4.5, engine.min_tp_pips), engine.max_tp_pips)
-    sl_pips = min(max(atr_pips * 1.5, engine.min_sl_pips), engine.max_sl_pips)
+    if engine_result['signal'] == 'NO-TRADE':
+        return None, engine_result['reason']
 
     entry_price = m5_df['close'].iloc[-1]
-
-    if direction == 'LONG':
-        tp_price = round(entry_price + tp_pips / 10000, 5)
-        sl_price = round(entry_price - sl_pips / 10000, 5)
+    if engine_result['signal'] == 'LONG':
+        tp_price = round(entry_price + engine_result['tp_pips'] / 10000, 5)
+        sl_price = round(entry_price - engine_result['sl_pips'] / 10000, 5)
     else:
-        tp_price = round(entry_price - tp_pips / 10000, 5)
-        sl_price = round(entry_price + sl_pips / 10000, 5)
+        tp_price = round(entry_price - engine_result['tp_pips'] / 10000, 5)
+        sl_price = round(entry_price + engine_result['sl_pips'] / 10000, 5)
 
     signal = {
         'id': len(load_signals()) + 1,
-        'signal': direction,
-        'confidence': round(confidence, 1),
-        'ml_confidence': round(ml_conf, 3),
-        'tp_pips': round(tp_pips, 1),
-        'sl_pips': round(sl_pips, 1),
-        'tp_sl_ratio': round(tp_pips / sl_pips, 1),
-        'atr_pips': round(atr_pips, 1),
+        'signal': engine_result['signal'],
+        'confidence': round(engine_result['confidence'], 1),
+        'ml_confidence': round(engine_result['ml_confidence'], 3),
+        'tp_pips': round(engine_result['tp_pips'], 1),
+        'sl_pips': round(engine_result['sl_pips'], 1),
+        'tp_sl_ratio': round(engine_result['tp_sl_ratio'], 1),
+        'atr_pips': round(engine_result['atr_pips'], 1),
         'entry_price': round(entry_price, 5),
         'tp_price': tp_price,
         'sl_price': sl_price,
         'timestamp': str(m5_df['time'].iloc[-1]),
-        'scores': {k: round(v, 1) for k, v in scores.items()},
+        'scores': {k: round(v, 1) for k, v in engine_result['scores'].items()},
         'result': 'pending',
         'pnl_pips': 0,
         'closed_at': None,
