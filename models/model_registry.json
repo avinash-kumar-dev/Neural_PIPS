@@ -100,6 +100,81 @@
         "long_accuracy_T78": "+25% (0.0 -> 25.0)",
         "base_accuracy": "+7.2% (87.7 -> 94.9)"
       },
+      "status": "superseded_by_v4"
+    },
+    "v4_retrained": {
+      "description": "Retrained with 100K M5 bars, June excluded, class weights (LONG=3.28, SHORT=0.59), 12 walk-forward windows.",
+      "train_method": "walk_forward_12_windows_class_weights",
+      "train_period": "2025-02-21 to 2026-05-29",
+      "n_features": 61,
+      "has_h4_regime": true,
+      "class_weights": {"long": 3.28, "short": 0.59},
+      "files": {
+        "xgboost": "models/v4_retrained/xgboost.joblib",
+        "lightgbm": "models/v4_retrained/lightgbm.joblib",
+        "meta": "models/v4_retrained/meta.joblib",
+        "feature_pipeline": "models/v4_retrained/feature_pipeline.joblib"
+      },
+      "metrics": {
+        "walk_forward_accuracy_mean": 0.8426,
+        "walk_forward_accuracy_std": 0.017,
+        "n_windows": 9,
+        "total_train_bars": 65309,
+        "train_time_seconds": null
+      },
+      "holdout_june_metrics": {
+        "base_accuracy": null,
+        "short_accuracy_T78": 78.4,
+        "short_signals_T78": 37,
+        "short_accuracy_T60": null,
+        "short_signals_T60": null
+      },
+      "status": "superseded_by_v5"
+    },
+    "v5_phase1": {
+      "description": "Phase 1 fixes: normalization leak fixed, CatBoost added, LogisticRegression meta, embargo=48, RobustScaler.",
+      "train_method": "walk_forward_12_windows_phase1",
+      "train_period": "2025-02-21 to 2026-05-29",
+      "n_features": 61,
+      "has_h4_regime": true,
+      "normalization_leak_fixed": true,
+      "catboost_added": true,
+      "meta_learner": "LogisticRegression",
+      "scaler": "RobustScaler",
+      "embargo_bars": 48,
+      "files": {
+        "xgboost": "models/v5_phase1/xgboost.joblib",
+        "lightgbm": "models/v5_phase1/lightgbm.joblib",
+        "catboost": "models/v5_phase1/catboost.joblib",
+        "meta": "models/v5_phase1/meta.joblib",
+        "feature_pipeline": "models/v5_phase1/feature_pipeline.joblib"
+      },
+      "metrics": {
+        "walk_forward_accuracy_mean": 0.8426,
+        "walk_forward_accuracy_std": 0.0165,
+        "n_windows": 9,
+        "total_train_bars": 65309,
+        "train_time_seconds": 143.5
+      },
+      "holdout_june_metrics": {
+        "base_accuracy": 86.0,
+        "session_short_predictions": 681,
+        "session_long_predictions": 39,
+        "session_total_bars": 720,
+        "long_accuracy_T78": 46.7,
+        "long_signals_T78": 15,
+        "long_accuracy_T80": 50.0,
+        "long_signals_T80": 14,
+        "short_signals_any_threshold": 0,
+        "ensemble_std_mean": 0.139,
+        "ensemble_std_max": 0.264,
+        "meta_proba_mean": 0.066
+      },
+      "known_issues": [
+        "Class weights made meta-learner too SHORT-biased (meta_proba mean=0.066)",
+        "High-confidence signals (T>=78) are all LONG with poor accuracy",
+        "Model never outputs SHORT with confidence > 0.5 — no high-confidence SHORT signals"
+      ],
       "status": "current"
     }
   }

@@ -1,17 +1,18 @@
 import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, RobustScaler
 from sklearn.feature_selection import VarianceThreshold
 import joblib
 import os
 
 
 class FeaturePipeline:
-    def __init__(self, variance_threshold=0.001):
+    def __init__(self, variance_threshold=0.001, use_robust_scaler=True):
+        scaler = RobustScaler() if use_robust_scaler else MinMaxScaler()
         self.pipeline = Pipeline([
             ('variance', VarianceThreshold(threshold=variance_threshold)),
-            ('scaler', MinMaxScaler()),
+            ('scaler', scaler),
         ])
         self.fitted = False
         self.feature_names_in_ = None

@@ -1,827 +1,569 @@
-# PHASE 0: EUR/USD 3:1 TP:SL Scalping Signal Generator — Complete Research
+# PHASE_0: EUR/USD M5 Scalping — Feature Engineering, Training & Data Prep Research
 
-*Synthesized from comprehensive research across 30+ sources (academic papers, practitioner guides, ML engineering resources, 2024-2026)*
-
----
-
-## Executive Summary
-
-This document presents complete research for building an EUR/USD scalping signal generator with a **strict 3:1 minimum TP:SL ratio**. The system generates LONG/SHORT/NO-TRADE signals only — no execution automation.
-
-**Key Parameters:**
-- **Target Asset**: EUR/USD only
-- **Risk Profile**: Minimum 3:1 TP:SL (SL=5 pips, TP=15 pips)
-- **Signal Output**: LONG / SHORT / NO-TRADE via Telegram/Email
-- **Session**: London-NY Overlap only (13:00-16:00 UTC)
-- **Expected Signals**: 1-3 per day
-- **Target Win Rate**: >35% (break-even is 25%)
+**Date:** 2026-06-27
+**Focus:** EUR/USD M5 scalping prediction with 3:1 TP:SL
+**Sources:** 40+ web sources including academic papers, Qlib docs, trading research, ML best practices
 
 ---
 
-## 1. EUR/USD Behavioral Analysis
+## 1. Feature Engineering for Forex M5 Scalping
 
-### 1.1 Average Daily Range (ADR)
+### 1.1 What Actually Works on M5
 
-| Metric | Value | Source |
-|--------|-------|--------|
-| **Current 10-week ADR** | **60 pips** | TradeThatSwing/Mataf (June 2026) |
-| **Current 5-week ADR** | **53 pips** | TradeThatSwing |
-| **Current 2-week ADR** | **59 pips** | TradeThatSwing |
-| **Recent high-vol period** | **84 pips** | TradeThatSwing (Mar 2026) |
-| **Typical range** | **50-90 pips/day** | TradeThatSwing |
-| **5-year historical** | **60-110 pips** | TradeThatSwing |
+Based on multiple research sources and live trading systems, the most predictive features for EUR/USD M5 scalping fall into these categories:
 
-**Key Insight**: EUR/USD currently in "Common Low Volatility" regime (~60 pips/day). Sufficient for 3:1 TP:SL during active sessions.
+#### A. Price Action Features (Highest Signal)
+- **Candle body ratio**: `(close-open)/(high-low)` — directional conviction within the bar
+- **Upper/lower shadow ratios**: Selling/buying pressure indicators
+- **Price position**: `(2*close-high-low)/(high-low)` — where close sits in the range
+- **N-bar momentum**: Returns over 1, 2, 3, 5, 10, 15, 20 M5 bars
+- **Rate of change**: `Ref(close, d)/close` at multiple lookbacks
+- **Gap features**: Open relative to previous close
 
-### 1.2 Session Volatility Profile
+#### B. Trend Features (Medium Signal, High Filter Value)
+- **EMA crossovers**: 8/21 EMA on M5 (most cited for scalping), 5/13 for faster signals
+- **EMA position relative to price**: Binary features for above/below
+- **Multi-TF trend alignment**: H1 and H4 EMA direction as binary filters
+- **Linear regression slope**: Over 20-30 bars, indicates trend strength
+- **Supertrend direction**: (7, 2.0) setting for M5
 
-| Session | UTC Window | ATR/h (pips) | Session Range | 15+ Pip Moves | Suitability |
-|---------|------------|--------------|---------------|---------------|-------------|
-| Asian (Early) | 00:00-03:00 | 5-9 | 15-27 | 0-1 | ❌ Avoid |
-| Tokyo Core | 03:00-06:00 | 6-9 | 18-27 | 0-1 | ❌ Avoid |
-| Pre-London | 06:00-07:00 | 8-12 | 8-12 | 1-2 | ⚠️ Watch |
-| Asia-London Overlap | 07:00-09:00 | 14-20 | 28-40 | 2-4 | ✅ Tradeable |
-| London Core | 09:00-11:00 | 18-28 | 36-56 | 4-7 | ✅ Good |
-| London Lunch | 11:00-12:30 | 8-12 | 10-15 | 1-3 | ⚠️ Weak |
-| **London-NY Overlap** | **13:00-16:00** | **20-30+** | **60-90** | **6-10** | **✅ BEST** |
-| NY Solo | 16:00-19:00 | 10-16 | 30-48 | 1-3 | ⚠️ Moderate |
-| NY Late | 19:00-22:00 | 5-10 | 10-20 | 0-1 | ❌ Avoid |
+#### C. Momentum/Oscillator Features
+- **RSI(14)**: Classic, but use compressed periods (7-10) for M5 scalping
+- **Stochastic %K**: (14, 3, 3) or faster (5, 3, 3) for M5
+- **MACD histogram**: (5, 13, 1) for scalping — faster than standard (12, 26, 9)
+- **CCI(20)**: Commodity Channel Index for overbought/oversold
+- **Williams %R(14)**: Alternative to RSI
+- **Momentum(10)**: Price difference over 10 bars
 
-**Critical Finding**: London-NY overlap (13:00-16:00 UTC) has highest probability of 15+ pip moves. **This is the ONLY recommended trading window for 3:1 TP:SL.**
+#### D. Volatility Features
+- **ATR(14)**: Critical for TP/SL sizing — use 1.5x ATR for SL, 4.5x for TP
+- **Bollinger Band width**: Squeeze detection (period 20, dev 2.0)
+- **BB position**: Where price sits within the bands (0-1 scale)
+- **Rolling standard deviation**: Over 10, 20, 50 bars
+- **Historical volatility ratio**: Short-term vs long-term vol
 
-### 1.3 15+ Pip Move Frequency
+#### E. Volume/Flow Features
+- **Volume-weighted average price (VWAP)**: Deviation from VWAP
+- **On-balance volume (OBV)**: Cumulative volume flow
+- **Volume momentum**: Volume change rate
+- **Buy/sell pressure**: Volume on up-bars vs down-bars ratio
 
-| Session | Duration | Est. 15+ Pip Moves | Confidence |
-|---------|----------|-------------------|------------|
-| Asian | 9 hours | 0-1 | High |
-| London | 9 hours | 3-5 | High |
-| NY | 9 hours | 2-4 | Medium-High |
-| **Overlap (3-4 hrs)** | **3-4 hours** | **2-4** | **High** |
+#### F. Session/Time Features (Critical for Forex)
+- **Forex session flags**: Asian (00:00-08:00 UTC), London (08:00-16:00 UTC), NY (13:00-21:00 UTC)
+- **Overlap flag**: London-NY overlap (13:00-16:00 UTC) — highest liquidity
+- **Hour-of-day sin/cos encoding**: Fourier harmonics for cyclical time
+- **Session volatility**: Rolling std of returns within each session
+- **Days to month-end**: Institutional rebalancing effects
 
-**Per Day Total**: Approximately **5-8 distinct 15+ pip directional moves** during active sessions.
-
-**M15 Candle Analysis**:
-- M15 candles average 4-8 pips during active hours
-- During overlap: M15 candles average 6-12 pips
-- 15+ pip M15 candles: **5-10% of M15 candles** during peak hours
-
-### 1.4 Spread Dynamics (ECN/Raw Accounts)
-
-| Session/Time | Spread (pips) | Notes |
-|-------------|---------------|-------|
-| Asian session | 0.5-1.2 | Avoid |
-| London open | 0.1-0.3 | Good |
-| London full | 0.0-0.2 | Excellent |
-| **Overlap** | **0.0-0.1** | **Best** |
-| NY afternoon | 0.1-0.4 | Good |
-| Daily close | 0.3-0.6+ | Avoid |
-
-**Broker Spreads (Overlap, Q1 2026)**:
-| Broker | Avg Spread | Commission | Total Cost/Lot |
-|--------|-----------|------------|----------------|
-| Exness | 0.0 | $3.50 | $3.50 |
-| IC Markets | 0.1 | $3.50 | $4.50 |
-| Pepperstone | 0.2 | $3.50 | $5.50 |
-
-**Impact on 3:1 TP:SL**: With 0.0-0.2 pip spread during overlap, transaction costs are negligible for 15+ pip target.
-
-### 1.5 Daily ATR by Day of Week
-
-| Day | Current Regime (pips) | High-Vol Regime (pips) |
-|-----|----------------------|------------------------|
-| Monday | 55 | 94 |
-| Tuesday | 63 | 94 |
-| Wednesday | 56 | 83 |
-| Thursday | 65 | 76 |
-| Friday | 63 | 72 |
-
-**Best Days**: Tuesday, Thursday, Friday (current regime); Monday, Tuesday (high-vol regime)
-
-### 1.6 Session Breakout Statistics
-
-From Edgeful data (last 3 months):
-- **NY breaks London high/low**: 95-97% of the time
-- **Breaks only high OR low**: 62-70%
-- **Breaks BOTH high AND low**: 26-35%
-- **Does not break either**: 3-5%
-
-**Implication**: London session high/low established between 08:00-13:00 UTC will almost always be broken by NY. This is a high-probability setup for 15+ pip moves.
+### 1.2 Features That Don't Work on M5
+- Slow moving averages (SMA 50, 100, 200) — too lagging for scalping
+- Daily pivot points — not granular enough for M5
+- Long-horizon momentum (60+ bars) — noise dominates
+- Raw price levels without normalization — scales meaningless
 
 ---
 
-## 2. 3:1 TP:SL Mathematical Framework
+## 2. Alpha158 Feature Set from Qlib
 
-### 2.1 Break-Even Analysis
+### 2.1 Structure
+Alpha158 contains **158 pre-built technical factors** organized into 7 categories:
 
-```
-Break-even Win Rate = 1 / (1 + R:R) = 1 / (1 + 3) = 25%
-```
+| Category | Count | Key Features | EUR/USD Relevance |
+|----------|-------|--------------|-------------------|
+| K-line patterns | 9 | KMID, KLEN, KMID2, KUP, KUP2, KLOW, KLOW2, KSFT, KSFT2 | **HIGH** — candle structure |
+| Price features | 4 | OPEN0, HIGH0, LOW0, VWAP0 | **MEDIUM** — relative positions |
+| Momentum/ROC | 29 | ROC over 5,10,20,30,60 windows | **HIGH** — rate of change |
+| Moving averages | 29 | SMA/EMA ratios at multiple periods | **MEDIUM** — trend detection |
+| Volatility | 29 | STD of returns, BB width, ATR | **HIGH** — risk measurement |
+| Volume | 29 | VSUMP, VSUMD, OBV ratios | **LOW** for EUR/USD (limited volume) |
+| Correlation/Regression | 29 | Rolling correlations, regression slopes | **MEDIUM** — pattern detection |
 
-| Win Rate | Expectancy (R) | Verdict |
-|----------|---------------|---------|
-| 20% | -0.20R | ❌ Losing |
-| 25% | 0.00R | ⚠️ Break-even |
-| 30% | +0.20R | ✅ Profitable |
-| 35% | +0.40R | ✅ Very profitable |
-| 40% | +0.60R | ✅ Excellent |
+### 2.2 Most Important Alpha158 Features for EUR/USD
+From research and feature importance analysis:
 
-### 2.2 TP/SL Combinations
+1. **ROC_5, ROC_10, ROC_20** — Short-term momentum is king for M5
+2. **STD_5, STD_10** — Volatility clustering matters
+3. **KMID2, KSFT2** — Candle structure within range
+4. **MA_5/close, MA_10/close** — Short-term mean reversion
+5. **VWAP deviation** — Institutional reference price
 
-| SL (pips) | TP (pips) | Spread Impact | Net R:R | Notes |
-|-----------|-----------|--------------|---------|-------|
-| 3 | 9 | 10% of TP | 2.7:1 | Tight stops, risky |
-| **5** | **15** | **2% of TP** | **2.94:1** | **Optimal** |
-| 7 | 21 | 1.4% of TP | 2.96:1 | Good |
-| 10 | 30 | 1% of TP | 2.97:1 | Conservative |
-| 15 | 45 | 0.7% of TP | 2.98:1 | Ideal R:R, harder to hit |
-
-**Recommended**: SL=5 pips, TP=15 pips. Fits within single M15 candle during London-NY overlap.
-
-### 2.3 Signal Frequency Expectations
-
-| Filtering Level | Signals/Day | Expected Win Rate |
-|-----------------|-------------|-------------------|
-| Minimal | 10-20 | 15-20% |
-| Moderate (session + H1) | 5-10 | 20-25% |
-| Strict (MTF + ADX) | 2-5 | 30-40% |
-| **Full gate (all filters)** | **1-3** | **35-45%** |
-
-**Research Finding**: 1-3 high-conviction signals per day is realistic at 3:1. This is viable if win rate exceeds 25%.
+### 2.3 Warning
+Alpha158 is public (15K+ GitHub stars). Everyone uses these 158 factors → **alpha erosion**. Use as baseline, then build custom factors that others don't have.
 
 ---
 
-## 3. Feature Engineering for 3:1 TP:SL
+## 3. Feature Selection Methods
 
-### 3.1 Tier 1: Highest-Impact Features (Must Have)
+### 3.1 Recommended Pipeline for EUR/USD
 
-#### 3.1.1 Multi-Timeframe Trend Alignment (MTF Score)
+```
+Step 1: VarianceThreshold (threshold=0.01)
+  → Remove near-constant features
 
-**Why it matters most**: A single study showed win rate jumped from 42% to 61% when requiring multi-timeframe RSI convergence.
+Step 2: Correlation filter (|r| > 0.95)
+  → Remove redundant features
 
-| Timeframe | Role | Bullish Condition | Bearish Condition |
-|-----------|------|-------------------|-------------------|
-| H4 | Bias | Price > EMA 200 AND EMA 9 > EMA 21 | Price < EMA 200 AND EMA 9 < EMA 21 |
-| H1 | Structure | Price > EMA 50 AND recent bullish BOS | Price < EMA 50 AND recent bearish BOS |
-| M15 | Trigger | EMA 9 crosses above EMA 21 OR pullback to EMA 21 holds | EMA 9 crosses below EMA 21 OR pullback to EMA 21 fails |
+Step 3: Mutual Information (mutual_info_classif)
+  → Rank features by MI score, keep top 30-50
 
-**Confluence Scoring (0-7)**:
-- H4 trend direction matches trade (+1)
-- H1 structure supports trade direction (+1)
-- M15 trigger candle present (+1)
-- Volume confirms (+1)
-- London/NY session (+1)
-- No high-impact news in next 60 min (+1)
-- ADX confirms trend strength (+1)
+Step 4: Model-based importance (XGBoost/LightGBM)
+  → SHAP values for final selection
 
-**Threshold**: Only take trades with confluence score >= 5.
-
-**Critical Rule**: If H4 is bullish, ONLY take longs on M15. Period.
-
-#### 3.1.2 ADX Trend Strength Filter
-
-**Recommended Settings for EUR/USD M15**:
-
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| ADX Period | 10 | Faster response for M15 |
-| +DI Period | 10 | Match ADX period |
-| -DI Period | 10 | Match ADX period |
-| Applied to | Close | Standard |
-
-**Threshold Levels**:
-
-| ADX Reading | Interpretation | Action |
-|-------------|---------------|--------|
-| < 15 | No trend / ranging | DO NOT TRADE |
-| 15-20 | Weak trend forming | Watch only |
-| 20-25 | Developing trend | Valid with other confirmation |
-| **25-40** | **Strong, tradeable trend** | **IDEAL ZONE for 3:1 setups** |
-| 40-50 | Very strong trend | Valid but watch for exhaustion |
-| > 50 | Extreme / potential exhaustion | Reduce position |
-
-**Key Rules**:
-- ADX must be > 20 AND rising (not just above 20)
-- +DI must be above -DI for longs (and vice versa for shorts)
-- Use completed bar (shift=1), not forming bar
-
-#### 3.1.3 RSI Momentum Zones (Trend Continuation)
-
-**Recommended Settings**:
-
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| RSI Period | 14 | Standard; 9 for faster M5 signals |
-| Timeframe | M15 | Primary entry timeframe |
-| H1 RSI | 14 | Trend context check |
-
-**Trend Continuation Zones (NOT Reversal)**:
-
-| Zone | RSI Value | Meaning | Action |
-|------|-----------|---------|--------|
-| Deep pullback (long) | 40-45 | Strong pullback in uptrend | **IDEAL entry zone** |
-| Shallow pullback (long) | 45-50 | Mild pullback, momentum strong | Good entry |
-| Neutral (long) | 50-55 | No pullback yet | Wait |
-| Overbought warning (long) | 70+ | Extended move | Do NOT enter new longs |
-| Deep pullback (short) | 55-60 | Strong pullback in downtrend | **IDEAL entry zone** |
-| Shallow pullback (short) | 50-55 | Mild pullback | Good entry |
-| Oversold warning (short) | <30 | Extended move | Do NOT enter new shorts |
-
-**Critical Insight**: In strong trends (ADX > 50), RSI can stay overbought/oversold for days. Do NOT exit winning trades just because RSI hits 75.
-
-#### 3.1.4 Break of Structure (BOS) Detection
-
-**Recommended Parameters**:
-
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Swing detection window | 5-10 bars | Balance sensitivity/noise |
-| Momentum threshold | 1.5x ATR | Only count meaningful breaks |
-| Break validation | Body close required | Wick-only breaks are liquidity sweeps |
-| Lookback period | 10-20 bars | For structural highs/lows |
-
-**Feature Encoding**:
-```python
-bullish_bos = (close > prev_swing_high) AND (close[1] <= prev_swing_high) AND (body_size > 0.5 * ATR)
-bearish_bos = (close < prev_swing_low) AND (close[1] >= prev_swing_low) AND (body_size > 0.5 * ATR)
+Step 5: Stability check
+  → Verify feature importance is stable across walk-forward windows
 ```
 
-**BOS + Volume Confirmation**: A BOS with volume > 1.5x the 20-period average has significantly higher continuation rate.
+### 3.2 VarianceThreshold
+- Remove features with variance < 0.01 (normalized scale)
+- For forex, this removes features that don't move meaningfully
+- Scikit-learn: `VarianceThreshold(threshold=0.01)`
 
-### 3.2 Tier 2: Strong Confirmation Features
+### 3.3 Mutual Information
+- **Model-agnostic**: Works regardless of final model choice
+- **Captures non-linear relationships**: Unlike correlation
+- **Handles mixed data types**: Works with both continuous and categorical
+- Use `mutual_info_classif()` for classification targets
+- Retain features with MI > median + 1 std
 
-#### 3.2.1 MACD Momentum Confirmation
+### 3.4 SHAP-Based Selection
+- Train XGBoost, compute SHAP values
+- Rank features by mean |SHAP value|
+- Use iterative removal (shap-select framework)
+- Keep features with statistically significant SHAP contributions
 
-**Recommended Settings**:
-
-| Setting | Value | Use Case |
-|---------|-------|----------|
-| Fast EMA | 5 | Responsive to recent price |
-| Slow EMA | 35 | Captures medium-term trend |
-| Signal line | 5 | Confirmation |
-| Alternative | 8, 17, 9 | More conservative |
-
-**Histogram Analysis**:
-- Histogram expanding in trade direction = momentum behind the move (good)
-- Histogram flat or shrinking on breakout = weak move, likely to fail
-- Histogram divergence (price makes new high but MACD doesn't) = exhaustion warning
-
-#### 3.2.2 EMA Slope (Trend Acceleration)
-
-**Recommended Calculation**:
-```python
-# EMA Slope as percentage change (normalized)
-ema_slope = (ema_current - ema_previous) / ema_previous * 100
-```
-
-**Parameters**:
-- EMA Period: 21 (medium-term trend on M15)
-- Slope measurement: Current vs 1 bar ago
-- Minimum slope threshold: 0.01%
-
-**Interpretation**:
-- Rising slope = trend accelerating (ideal for continuation)
-- Flat slope = trend stalling (avoid new entries)
-- Falling slope while price still rising = momentum fading (tighten stops)
-
-#### 3.2.3 Volume Features (Breakout Prediction)
-
-**Recommended Features**:
-
-| Feature | Calculation | Threshold |
-|---------|-------------|-----------|
-| Volume Ratio | Current volume / 20-period SMA(volume) | > 1.2 = confirming |
-| Volume Z-Score | (volume - mean) / std(volume) | > 2.0 = abnormal spike |
-| ATR-Normalized Volume | Volume / ATR(14) | Adapts to volatility |
-| Volume Trend | Slope of volume over 10 bars | Rising = building participation |
-
-**CVD (Cumulative Volume Delta) Features**:
-
-| Feature | What It Shows | Signal |
-|---------|---------------|--------|
-| CVD rising with price rising | Aggressive buying | Strong continuation |
-| CVD flat while price rises | Passive buying | Weak move |
-| CVD divergence (price up, CVD down) | Buyers losing conviction | Exhaustion warning |
-| CVD spike on breakout | Real buying behind breakout | High-probability continuation |
-
-### 3.3 Tier 3: Supporting Features
-
-#### 3.3.1 Volatility Regime Detection
-
-| Feature | Calculation | Signal |
-|---------|-------------|--------|
-| Bollinger Band Width | (Upper - Lower) / Middle | Narrowing = compression |
-| ATR Ratio | ATR(14) / ATR(50) | < 0.8 = compression, > 1.2 = expansion |
-| ATR Percentile | Rank of current ATR vs 100-period history | < 20th percentile = compression |
-
-**Volatility Compression Breakout Pattern**:
-1. Detect compression: Bollinger Bands narrow AND ATR falls below its moving average
-2. Wait for expansion: ATR spike + large candle body
-3. Confirm breakout: Price closes outside Bollinger Bands AND direction aligns with EMA trend
-4. This 4-layer confirmation drastically reduces false signals
-
-#### 3.3.2 ATR-Based Stop/Target Calibration
-
-| Parameter | Formula | Notes |
-|-----------|---------|-------|
-| Stop Loss | 1.5 x ATR(14) | Adapts to current volatility |
-| Take Profit | 4.5 x ATR(14) | Maintains 3:1 ratio |
-| Dynamic TP | If ATR expands mid-trade, widen target | Trend accelerating |
-| Trailing Stop | Activate at 2 x ATR profit, trail by 1 x ATR | Lock in profits |
-
-### 3.4 Feature Ranking Summary
-
-| Rank | Feature | Category | Impact | Parameters |
-|------|---------|----------|--------|------------|
-| 1 | Multi-Timeframe Alignment (H4+H1+M15) | Structure | Very High | EMA 200/50/21, BOS |
-| 2 | ADX Trend Strength | Trend | Very High | Period=10, threshold=25, rising |
-| 3 | RSI Trend Continuation Zones | Momentum | High | Period=14, entry zone 40-50 |
-| 4 | Break of Structure (BOS) | Structure | High | Swing window=5-10, momentum=1.5x ATR |
-| 5 | MACD Histogram Momentum | Momentum | High | Settings=(5,35,5), histogram expanding |
-| 6 | EMA 21 Slope | Trend | Medium-High | Percentage change, > 0.01% |
-| 7 | Volume Ratio (current/20-SMA) | Volume | Medium-High | Threshold > 1.2x |
-| 8 | CVD Divergence/Confirmation | Order Flow | Medium | Rising with price = confirming |
-| 9 | Volatility Compression State | Volatility | Medium | BB Width narrowing + ATR < MA |
-| 10 | Session Filter | Timing | Medium | London/NY overlap only |
-| 11 | ATR-Based Stop Calibration | Risk Mgmt | Medium | 1.5x ATR stop, 4.5x ATR target |
-| 12 | Spread Filter | Execution | Low-Medium | Max 1.5 pips |
+### 3.5 Key Research Finding
+From "Forex forecasting: The critical role of feature selection" (2025):
+> "Prediction accuracy does NOT correlate linearly with feature quantity."
+> More features ≠ better. Optimal is usually 15-40 features for forex ML.
 
 ---
 
-## 4. Multi-Timeframe Confirmation Hierarchy
+## 4. Walk-Forward Validation Best Practices
 
-### 4.1 Timeframe Roles
+### 4.1 Recommended Configuration for EUR/USD M5
 
-| Timeframe | Role | Function | Decision |
-|-----------|------|----------|----------|
-| **H4** | Structural Bias | Sets directional bias and major trend context | WHICH direction to trade |
-| **H1** | Liquidity Positioning | Identifies key structural levels, supply/demand zones | WHERE to look for entry |
-| **M15** | Setup Identification | Confirms trade setup is forming at right location | WHEN to prepare for entry |
-| **M5** | Execution Trigger | Provides precise entry timing and stop-loss placement | HOW to execute the trade |
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| Train window | 6 months (~25,000 M5 bars) | Enough data for pattern learning |
+| Test window | 1 month (~4,200 M5 bars) | Enough trades for statistical significance |
+| Purge period | 20 bars (100 min) | Prevents label overlap |
+| Embargo period | 20 bars (100 min) | Prevents contamination after test |
+| Number of windows | 30 | ~2.5 years of rolling validation |
+| Window type | Rolling (not anchored) | More realistic for regime changes |
 
-### 4.2 H4 as HARD Filter (Must Agree)
+### 4.2 Purge and Embargo Rules
+- **Purge**: Remove training samples whose forward-looking labels overlap test period
+- **Embargo**: Block samples immediately after test window (label contamination)
+- **Horizon-aware purge**: If labels look forward by N bars, purge last N training samples
+- For M5 with 20-bar horizon: purge = 20 bars minimum
 
-**Rationale from institutional sources**:
+### 4.3 Walk-Forward Efficiency
+- Calculate OOS performance / IS performance ratio
+- Ratio close to 1.0 = robust strategy
+- Ratio < 0.5 = overfitting likely
+- Target: WF efficiency > 0.6
 
-> "A 15-minute signal that contradicts the daily bias is not a signal. It's a liquidity grab running inside a larger counter-move." — TradeWithBanks
-
-> "The higher timeframe direction is never overridden by a lower timeframe signal, no matter how clean the signal looks." — CompareBroker.io
-
-**Why H4 must be a hard filter for 3:1 R:R scalping**:
-
-1. **Risk-to-Reward Mathematical Requirement**: Counter-trend scalps against H4 bias show win rates 10-20 percentage points lower than aligned entries.
-
-2. **Institutional Flow Alignment**: H4 represents where larger participants are positioning. Trading against this flow means entering positions professional traders push against.
-
-3. **Signal Quality Filtering**: Adding H4 alignment reduces signal frequency by 50-65%, but dramatically improves quality.
-
-**Implementation Rules**:
-- Only take LONG signals when H4 shows bullish structure (HH/HL or bullish bias)
-- Only take SHORT signals when H4 shows bearish structure (LH/LL or bearish bias)
-- When H4 is in consolidation/range: reduce position size or avoid trading
-
-### 4.3 Minimum Timeframe Alignment
-
-**Recommended Minimum: 3 out of 4 Timeframes Aligned**
-
-| Tier | Timeframes Required | Purpose |
-|------|---------------------|---------|
-| **Minimum** | H4 + H1 + M5 | Structural bias + level identification + execution |
-| **Ideal** | H4 + H1 + M15 + M5 | Full 4-timeframe confluence |
-| **Aggressive** | H4 + M15 + M5 | Reduced filtering (higher frequency, lower win rate) |
-
-**Signal Frequency Impact**:
-
-| Configuration | Signals/Session | Est. Win Rate | Quality |
-|---------------|-----------------|---------------|---------|
-| M5 only (no filters) | 15-25 | 45-50% | Low |
-| H1 + M5 | 8-12 | 55-60% | Medium |
-| H4 + H1 + M5 | 4-7 | 60-65% | High |
-| **H4 + H1 + M15 + M5** | **2-4** | **65-70%+** | **Very High** |
-
-### 4.4 Optimal Entry Timeframe: M5 (with M15 for Confirmation)
-
-**Professional Consensus**:
-
-> "Scalper Timeframe Stack: 4H (session directional bias), 1H (key structural levels), 15M (setup identification), 5M (entry trigger and stop-loss)." — CompareBroker.io
-
-**Why M5 is optimal for 3:1 entries**:
-
-1. **Tighter Stop-Losses**: M5 allows stops of 5-10 pips vs 10-20 pips on M15
-2. **Better R:R Mechanics**: M5 stop (8 pips) with 3:1 = 24 pip target (achievable)
-3. **More Precise Entries**: M5 shows micro-structure for exact entry timing
-4. **Reduced Slippage Impact**: Tighter entries mean less slippage cost relative to target
-
-**M15 Role (Setup, Not Entry)**:
-- Confirm momentum alignment (RSI, MACD direction)
-- Identify pullback zones within H1 structure
-- Validate that the M5 signal is not a false breakout
-
-### 4.5 Complete MTF Hierarchy Diagram
-
-```
-H4 (Hard Filter)
-├── Purpose: Directional bias ONLY
-├── Method: Price action structure (HH/HL, LH/LL)
-├── Rule: NEVER trade against H4 bias
-└── Action: Binary filter (trade/don't trade)
-
-H1 (Level Filter)
-├── Purpose: Identify key structural levels
-├── Method: Support/resistance, supply/demand zones
-├── Rule: Only enter at H1 structural levels
-└── Action: Location filter (where to enter)
-
-M15 (Setup Confirmation)
-├── Purpose: Confirm setup is valid
-├── Method: Momentum indicators (RSI, MACD)
-├── Rule: M15 must show momentum alignment with H4
-└── Action: Quality filter (when to prepare)
-
-M5 (Execution)
-├── Purpose: Precise entry and stop placement
-├── Method: Candlestick patterns, price action
-├── Rule: Enter on M5 trigger with tight stop
-└── Action: Execution (where to enter and stop)
-```
-
-### 4.6 Entry Checklist
-
-Before any trade:
-1. [ ] H4 shows bullish/bearish bias (not ranging)
-2. [ ] Price is at H1 structural level (support/resistance)
-3. [ ] M15 momentum aligns with H4 direction
-4. [ ] M5 shows clean entry signal (engulfing, pin bar, breakout)
-5. [ ] Stop placed below/above M5 swing (5-10 pips)
-6. [ ] Target = 3x stop distance (15-30 pips)
-7. [ ] Session is London-NY overlap (highest probability)
+### 4.4 Common Mistakes
+- Using anchored (expanding) windows — inflates performance with old data
+- Not including transaction costs in both IS and OOS
+- Optimizing more than sqrt(N) parameters (for 500 observations: <22 params)
+- Too few trades in test window (minimum 20-30)
 
 ---
 
-## 5. Model Architecture
+## 5. Class Imbalance in Forex
 
-### 5.1 Recommended: Ensemble Hybrid (Rule-Based + ML)
+### 5.1 The Problem
+EUR/USD with 3:1 TP:SL produces naturally imbalanced labels:
+- Typically: ~50-60% SHORT, ~40-50% LONG, or worse
+- Sometimes: 85% SHORT vs 15% LONG (market regime dependent)
+- NO-TRADE labels further complicate distribution
 
-**Rationale**:
+### 5.2 Recommended Solutions (Priority Order)
 
-A pure rule-based system is insufficient because:
-- EUR/USD has ~75-pip average daily range and ~0.8-pip spread
-- Achieving 3:1 requires identifying *conviction setups* — not just direction
-- Rule-based systems cannot dynamically rank signal quality or adapt to changing regimes
+1. **Class weights** (Try first — computationally free)
+   - `class_weight='balanced'` in sklearn
+   - XGBoost: `scale_pos_weight = neg_count/pos_count`
+   - LightGBM: `is_unbalance=True`
+   - No synthetic data, no distribution distortion
 
-A pure ML system is insufficient because:
-- With only 1-3 signals/day, training data for high-quality setups is extremely sparse
-- ML models overfit easily on rare events without structural constraints
-- Interpretability matters for trust and debugging
+2. **SMOTE** (If class weights insufficient)
+   - Generate synthetic minority samples
+   - Use only on training data, never on test
+   - k_neighbors=5 default works for forex
+   - **SMOTE-ENN** hybrid for better quality
 
-**Recommended Architecture: 3-Layer Ensemble**
+3. **Threshold adjustment** (Post-training)
+   - Instead of 0.5 threshold, optimize for F1 or profit
+   - Use precision-recall curve to find optimal threshold
+
+4. **Focal loss** (If using neural networks)
+   - Down-weights easy examples, focuses on hard ones
+   - γ=2.0, α=0.25 works well
+
+### 5.3 Evaluation Metrics for Imbalanced Forex
+- **DO NOT use accuracy** — misleading with imbalance
+- Use: F1-score, AUC-PR, AUC-ROC, Balanced Accuracy
+- For trading: Use risk-adjusted return as final metric
+- Track: Precision at fixed recall levels (e.g., recall@10%)
+
+---
+
+## 6. Data Normalization
+
+### 6.1 Scaler Comparison for Forex Features
+
+| Scaler | How It Works | Best For | Forex Suitability |
+|--------|-------------|----------|-------------------|
+| **RobustScaler** | Median ± IQR | Outlier-heavy data | **BEST for forex** — price spikes common |
+| **StandardScaler** | Mean ± Std | Gaussian-like features | Good for normalized returns |
+| **MinMaxScaler** | Min-Max to [0,1] | Bounded features | Avoid — outlier-sensitive |
+| **MaxAbsScaler** | Max absolute value | Sparse data | Alternative for returns |
+
+### 6.2 Recommended Pipeline
+```
+1. Returns-based features → StandardScaler (returns are roughly Gaussian)
+2. Indicator features (RSI, etc.) → RobustScaler (bounded but with outliers)
+3. Ratio features → MinMaxScaler (already bounded)
+4. Price-based features → Convert to returns first, then StandardScaler
+```
+
+### 6.3 Critical Rules
+- **Fit on training data only**, transform test data with training scaler
+- **Never refit scaler on production data**
+- **Save scaler with model** using joblib
+- **Winsorize extreme values BEFORE scaling** (clip at ±5σ)
+
+### 6.4 Production Consideration
+For tree-based models (XGBoost, LightGBM, CatBoost): **scaling is optional** — trees are scale-invariant. But scaling helps:
+- Feature importance comparison
+- Regularization effectiveness
+- Neural network convergence (if used in ensemble)
+
+---
+
+## 7. Feature Importance for EUR/USD
+
+### 7.1 Most Predictive Indicators (Research-Backed)
+
+**Tier 1 — Highest Predictive Power:**
+1. **ATR(14)** — Volatility is the strongest predictor for scalping exits
+2. **RSI(7-10)** — Fast RSI for momentum timing
+3. **EMA(8)/EMA(21) cross** — Trend direction
+4. **Candle body ratio** — Intraday conviction
+5. **Volume momentum** — Participation confirmation
+
+**Tier 2 — Strong Supporting Features:**
+6. **BB width squeeze** — Volatility expansion precursor
+7. **MACD histogram** — Momentum direction change
+8. **Price relative to VWAP** — Institutional reference
+9. **Session overlap flag** — Liquidity context
+10. **Stochastic %K** — Overbought/oversold timing
+
+**Tier 3 — Weak Alone, Useful in Combination:**
+11. CCI(20)
+12. Williams %R
+13. Linear regression slope
+14. Rolling correlation features
+15. Calendar effects (month-end, Friday close)
+
+### 7.2 Key Finding from Research
+From "Transitioning from static to temporal ML models" (2026):
+> "Oil price dynamics, geopolitical uncertainty, and short-term memory are the most relevant predictors for EUR/USD."
+
+From the EUR/USD ML framework paper:
+> "LSTM achieved R²=0.9234 for price prediction, but macroeconomic indicators showed limited explanatory power for forecast errors — models learn from price patterns, not fundamentals."
+
+**Implication**: For M5 scalping, focus on price-derived features, not macro data.
+
+---
+
+## 8. Multi-Timeframe Features
+
+### 8.1 Proper MTF Architecture for M5 Scalping
 
 ```
-Layer 1: Rule-Based Filter (eliminates ~90% of bars)
-    - Market regime detection (trend vs range)
-    - Volatility gate (ATR filters)
-    - Spread/session filters (London/NY overlap only)
-    - Structure filters (support/resistance proximity)
-
-Layer 2: ML Scoring Engine (XGBoost)
-    - Binary classifier: "Is this a valid 3:1 setup?" (yes/no)
-    - Outputs probability score 0-100
-    - Trained on rule-filtered data only
-
-Layer 3: Confidence Gate
-    - Hard threshold on confidence score (recommend >= 70)
-    - Optional: secondary model confirmation
+Entry Timeframe: M5 (signal generation)
+Confirmation:    M15 (trend filter)
+Context:         H1 (structure)
+Hard Filter:     H4 (never trade against)
 ```
 
-### 5.2 Confidence Scoring System (0-100)
+### 8.2 How to Combine MTF Features
 
-**8-Factor Weighted Score**:
-
-| Factor | Weight | What It Measures |
-|--------|--------|-----------------|
-| 1. Trend Alignment | 20% | Higher-timeframe trend agrees with signal direction |
-| 2. Momentum Confirmation | 15% | RSI/MACD/price action momentum supports entry |
-| 3. Volatility Regime | 15% | ATR within historical normal range (not extreme) |
-| 4. Structure Proximity | 15% | Signal near key S/R level or price structure |
-| 5. Pattern Quality | 10% | How "textbook" the entry pattern appears |
-| 6. Multi-Timeframe Agreement | 10% | Alignment across M5/M15/H1 |
-| 7. Session Quality | 10% | London/NY overlap (peak liquidity) |
-| 8. Spread Condition | 5% | Current spread < 1.0 pip |
-
-**Score Calculation**:
+**Method 1: Feature Concatenation**
 ```python
-confidence_score = sum(factor_score[i] * weight[i]) * 100
+# M5 features: RSI, EMA, ATR, candle pattern, momentum
+# M15 features: RSI, EMA, trend direction
+# H1 features: trend direction, key levels
+# H4 features: trend direction (binary: up/down)
+# Concatenate all into one feature vector
 ```
 
-**Threshold Recommendations**:
-- **Score >= 70**: High conviction, full position size
-- **Score 50-69**: Medium conviction, reduced size or skip
-- **Score < 50**: NO TRADE (filtered out)
-
-**Backtest Validation**:
-- 6/12 score = 55.2% win rate
-- 10/12 score = 76.3% win rate
-- 11-12/12 score = 81.5% win rate
-
-### 5.3 XGBoost Configuration for 3:1 Labeling
-
+**Method 2: Higher-TF as Filters**
 ```python
-import xgboost as xgb
-from sklearn.utils.class_weight import compute_sample_weight
-
-model = xgb.XGBClassifier(
-    # Core architecture
-    n_estimators=300,
-    max_depth=3,              # Shallow trees prevent overfitting
-    learning_rate=0.05,       # Slow learning rate for stability
-    
-    # Imbalance handling
-    objective='binary:logistic',
-    scale_pos_weight=...,      # Computed dynamically
-    max_delta_step=1,          # Prevents overcorrection
-    
-    # Regularization
-    subsample=0.8,
-    colsample_bytree=0.8,
-    reg_alpha=1.0,            # L1 regularization
-    reg_lambda=1.0,           # L2 regularization
-    gamma=0.1,                # Minimum loss reduction for split
-    
-    # Training controls
-    early_stopping_rounds=20,
-    eval_metric='logloss',    # Best for probability calibration
-    random_state=42,
-)
+if H4_trend == "down" and signal == "LONG":
+    reject_signal()
+if H1_trend == "down" and signal == "LONG":
+    reduce_confidence()
 ```
 
-**Critical: `scale_pos_weight` Calculation**:
+**Method 3: Hierarchical Features**
 ```python
-# For binary: "Is this a valid 3:1 setup?" (yes/no)
-# The minority class (valid setups) will be ~2-5% of filtered data
-scale_pos_weight = (count_negative) / (count_positive)
-# If 5% positive: scale_pos_weight = 19
-# If 2% positive: scale_pos_weight = 49
+# Compute indicators on each timeframe
+# Then compute CROSS-timeframe features:
+mtf_rsi_divergence = RSI_M5 - RSI_H1
+mtf_ema_alignment = EMA_M5_direction == EMA_H1_direction
+mtf_vol_ratio = ATR_M5 / ATR_H1
 ```
 
-**Why These Parameters**:
-- `max_depth=3`: Trees deeper than 5 overfit on financial data
-- `learning_rate=0.05`: Combined with 300 estimators, gives 15 effective boosting rounds
-- `eval_metric='logloss'`: Produces calibrated probabilities essential for confidence scoring
+### 8.3 Recommended Approach for ML
+Use **Method 1 + Method 2**:
+- Include M15, H1, H4 indicators as input features (Method 1)
+- Add binary H4 trend alignment as a hard filter (Method 2)
+- The ML model learns the interaction between timeframes
 
-### 5.4 Triple-Barrier Labeling for 3:1
+### 8.4 Timeframe Separation Rule
+Use timeframes separated by factor of 4-6x:
+- M5 → M15 (3x) → H1 (4x) → H4 (4x)
+- This ensures each timeframe adds distinct information
 
+---
+
+## 9. Lookback Window Optimization
+
+### 9.1 Recommended Lookback Windows for M5
+
+| Feature Type | Lookback | Rationale |
+|-------------|----------|-----------|
+| Momentum/ROC | 5, 10, 15, 20 bars | 25-100 minutes |
+| Volatility (ATR) | 14 bars | 70 minutes |
+| Moving averages | 8, 21, 50 bars | 40-250 minutes |
+| RSI | 7-14 bars | 35-70 minutes |
+| Bollinger Bands | 20 bars | 100 minutes |
+| Session volatility | Full session bars | ~48-72 bars per session |
+| Trend filters (H1) | 20-50 bars | 20-50 hours |
+| Trend filters (H4) | 10-20 bars | 40-80 hours |
+
+### 9.2 Optimization Warning
+**DO NOT optimize lookback periods** on the same data used for model training — this introduces data snooping bias. Instead:
+
+1. Use standard lookbacks (14 for ATR, 20 for BB, etc.)
+2. Verify strategy works across a RANGE of lookback values
+3. If results differ significantly with different lookbacks → overfitting
+4. Fix lookback periods before walk-forward testing
+
+### 9.3 Adaptive Lookback (Advanced)
+Use volatility-adaptive lookbacks:
+- Low volatility → longer lookback (more smoothing)
+- High volatility → shorter lookback (faster reaction)
+- Formula: `adaptive_period = base_period * (avg_vol / current_vol)`
+
+---
+
+## 10. Outlier Detection
+
+### 10.1 Outlier Types in Forex Data
+- **Data errors**: Bad ticks, feed glitches (extreme prices)
+- **News spikes**: NFP, FOMC, ECB — legitimate but extreme
+- **Flash crashes**: Real but rare events
+- **Weekend gaps**: Low-liquidity gaps
+
+### 10.2 Detection Methods
+
+| Method | Best For | Threshold |
+|--------|----------|-----------|
+| **IQR Method** | General use | 1.5× IQR from Q1/Q3 |
+| **Z-Score** | Normal distributions | |z| > 3 |
+| **Modified Z-Score** | Skewed data (forex) | |MZ| > 3.5 |
+| **Winsorization** | Keep data, reduce impact | Clip at 5th/95th percentile |
+
+### 10.3 Recommended Pipeline for Forex
 ```python
-def label_3to1(price_series, tp_pips=15, sl_pips=5, max_bars=20):
+# 1. Detect using Modified Z-Score (most robust for forex)
+from scipy.stats import median_abs_deviation
+mad = median_abs_deviation(returns)
+modified_z = 0.6745 * (returns - np.median(returns)) / mad
+outliers = np.abs(modified_z) > 3.5
+
+# 2. Winsorize (don't remove — extreme moves are real)
+from scipy.stats import mstats
+winsorized = mstats.winsorize(returns, limits=[0.05, 0.05])
+
+# 3. Separate handling by cause
+# Data errors → remove
+# News spikes → keep but flag
+# Flash crashes → keep (they're real market events)
+```
+
+### 10.4 Critical Rule
+**Never automatically remove outliers** in forex — they represent real market events (NFP, FOMC). Instead:
+1. Flag them with a binary feature `is_outlier`
+2. Winsorize extreme values at 5th/95th percentile
+3. Let the model learn from extreme events — they're important for risk management
+
+---
+
+## 11. Concept Drift
+
+### 11.1 What Causes Drift in EUR/USD
+- Central bank policy changes (Fed, ECB)
+- Regime shifts (trending → ranging → trending)
+- Volatility regime changes (calm → chaotic)
+- Liquidity changes (session transitions)
+- Geopolitical events (elections, crises)
+
+### 11.2 Detection Methods
+
+| Method | Type | Best For |
+|--------|------|----------|
+| **ADWIN** | Adaptive windowing | Sudden drift |
+| **KSWIN** | Kolmogorov-Smirnov test | Distribution shift |
+| **Page-Hinkley** | Cumulative sum | Gradual drift |
+| **DDM** | Drift Detection Method | Error rate changes |
+| **Rolling IC** | Information coefficient decay | Model degradation |
+
+### 11.3 Recommended Monitoring Pipeline
+```python
+# 1. Monitor prediction accuracy rolling window
+accuracy_window = rolling_accuracy(predictions, window=100)
+
+# 2. Monitor feature drift (PSI - Population Stability Index)
+for feature in features:
+    psi = calculate_psi(reference_dist, current_dist)
+    if psi > 0.25:
+        alert(f"Feature drift: {feature}")
+
+# 3. Monitor model performance decay
+ic_rolling = rolling_ic(predictions, actuals, window=500)
+if ic_rolling < 0.02:
+    trigger_retraining()
+
+# 4. ADWIN for sudden drift detection
+from river import drift
+adwin = drift.ADWIN()
+for error in prediction_errors:
+    adwin.update(error)
+    if adwin.drift_detected:
+        trigger_retraining()
+```
+
+### 11.4 Adaptation Strategy
+1. **Walk-forward retraining**: Every 1 month, retrain on last 6 months
+2. **Concept drift detection**: Monitor rolling IC, trigger if < threshold
+3. **Ensemble approach**: Keep multiple models, weight by recent performance
+4. **Online learning**: Incremental updates with new data (if using linear models)
+
+---
+
+## 12. Profit-Aware Training
+
+### 12.1 The Problem
+Traditional ML optimizes for accuracy/F1, but:
+- High accuracy ≠ profitable trading
+- A model predicting "always hold" has 100% accuracy but 0% profit
+- Classification accuracy ignores trade magnitude
+
+### 12.2 Profit-Aware Approaches
+
+**A. Custom Loss Function**
+```python
+def profit_loss(y_true, y_pred, tp=4.5, sl=1.5):
     """
-    Triple barrier labeling for 3:1 TP:SL
-    For each bar, look forward:
-    - If price hits +15 pips before -5 pips within max_bars: label = 1 (LONG)
-    - If price hits -15 pips before +5 pips within max_bars: label = -1 (SHORT)
-    - Otherwise: label = 0 (NO TRADE)
+    Custom loss that penalizes wrong direction more when
+    the trade would have hit SL before TP
     """
-    # Standard triple-barrier method from Lopez de Prado
-    # adapted for 3:1 asymmetric barriers
+    direction_correct = (y_true == y_pred)
+    # Weight losses by potential profit/loss ratio
+    loss = tf.where(direction_correct, 
+                    -y_pred * y_true * tp,  # profit term
+                    y_pred * y_true * sl)    # loss penalty
+    return tf.reduce_mean(loss)
 ```
 
-### 5.5 Ensemble Stacking Approach
-
-**Component Models**:
-
-| Layer | Model | Role |
-|-------|-------|------|
-| Gatekeeper | Rule-Based Filters | Binary: pass/block |
-| Scorer A | XGBoost (300 trees, depth=3) | Non-linear pattern recognition |
-| Scorer B | LightGBM (150 trees, depth=4) | Fast alternative gradient booster |
-| Scorer C | Logistic Regression | Linear baseline (sanity check) |
-| Meta-Learner | Ridge Regression | Combines A, B, C outputs |
-
-**Ensemble Logic**:
-```python
-def generate_signal(features, rule_filter, xgb_model, lgbm_model, lr_model, meta_model):
-    # Step 1: Rule-based gate (hard filter)
-    if not rule_filter.passes(features):
-        return "NO-TRADE", 0
-    
-    # Step 2: Get individual model probabilities
-    xgb_prob = xgb_model.predict_proba(features)
-    lgbm_prob = lgbm_model.predict_proba(features)
-    lr_prob = lr_model.predict_proba(features)
-    
-    # Step 3: Meta-learner combines
-    meta_features = [xgb_prob[1], lgbm_prob[1], lr_prob[1],
-                     volatility, trend_strength, spread]
-    confidence = meta_model.predict_proba(meta_features) * 100
-    
-    # Step 4: Threshold gate
-    if confidence >= 70:
-        direction = "LONG" if xgb_prob[1] > 0.5 else "SHORT"
-        return direction, confidence
-    else:
-        return "NO-TRADE", confidence
-```
-
----
-
-## 6. Validation Protocol
-
-### 6.1 Walk-Forward Validation
-
-**Standard random train/test splits will lie to you.** The BreakOrb 2026 study found that 99.49% of backtested strategies failed walk-forward validation.
-
-**Walk-Forward Setup**:
-- Training window: 6 months
-- Test window: 1 month
-- Step forward: 1 month
-- Total windows: 30 rolling windows
-
-**Each Window**:
-1. Train rule filters + XGBoost on training window
-2. Lock parameters
-3. Test on next 1-month out-of-sample
-4. Record: win rate, profit factor, Sharpe, max drawdown
-
-### 6.2 Required Minimum Metrics
-
-| Metric | Minimum | Target |
-|--------|---------|--------|
-| Walk-forward win rate | > 30% | > 40% |
-| Profit factor (test) | > 1.2 | > 1.5 |
-| Sharpe ratio | > 0.5 | > 1.0 |
-| Test trades per window | >= 10 | >= 20 |
-| Training trades per window | >= 30 | >= 50 |
-| Win rate consistency | > 60% profitable | > 75% profitable |
-| Max drawdown (test) | < 10% | < 5% |
-
-### 6.3 Purging and Embargo
+**B. Mean Absolute Directional Loss (MADL)**
+From recent research (2025):
+> "Models optimized with MADL consistently outperform accuracy-optimized models in risk-adjusted terms."
 
 ```python
-# Critical for overlapping label windows
-from sklearn.model_selection import TimeSeriesSplit
-
-# Purge: Remove training samples whose labels overlap with test period
-# Embargo: Add gap between train and test to prevent information leakage
-# For 3:1 with max_bars=20, embargo = 20 bars minimum
-
-purged_cv = PurgedKFold(
-    n_splits=5,
-    embargo_pct=0.01  # ~900 bars = enough for max_bars=20 overlap
-)
+def madl(y_true, y_pred):
+    """Optimizes for directional accuracy weighted by returns"""
+    return -np.mean(y_true * y_pred)
 ```
 
-### 6.4 Statistical Significance Testing
-
+**C. Sharpe Ratio as Objective**
 ```python
-from scipy import stats
-
-# Null hypothesis: strategy has no edge (win rate = 25%)
-t_stat, p_value = stats.ttest_1samp(window_win_rates, popmean=0.25)
-# Require p_value < 0.05 (95% confidence strategy beats break-even)
-
-# Additionally, apply Deflated Sharpe Ratio (Bailey & Lopez de Prado, 2014)
-# to correct for selection bias if you tested multiple configurations
+def neg_sharpe(returns):
+    """Negative Sharpe ratio for minimization"""
+    return -np.mean(returns) / (np.std(returns) + 1e-8)
 ```
 
-### 6.5 Overfitting Detection Metrics
+**D. Expectile Regression**
+- Optimize for specific quantiles of the return distribution
+- More robust than mean-based optimization
 
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| Train-test accuracy gap | < 5% | > 10% = overfitting |
-| Win rate stability across windows | > 60% | < 50% = overfitting |
-| Sharpe ratio | < 4.0 | > 4.0 = suspicious |
-| Parameter stability | Consistent across windows | Wild swings = overfitting |
+### 12.3 Recommended Approach
+1. **Primary training**: Use standard cross-entropy loss
+2. **Threshold optimization**: Post-training, optimize decision threshold for profit
+3. **Ensemble weighting**: Weight model outputs by their contribution to Sharpe ratio
+4. **Walk-forward profit evaluation**: Final model selection based on OOS profit, not accuracy
+
+### 12.4 Key Research Finding
+From Springer (2025):
+> "Simpler, interpretable models—particularly logistic regression with MADL optimization—consistently outperform complex architectures in risk-adjusted terms."
+
+**Implication**: Don't over-complicate. A well-tuned logistic regression with profit-aware loss can beat a complex LSTM.
 
 ---
 
-## 7. Backtesting Parameters
+## Summary: Actionable Configuration
 
-### 7.1 Configuration
-
-| Parameter | Value |
-|-----------|-------|
-| Pair | EUR/USD only |
-| Primary TF | M5 (entry) |
-| Confirmation TF | M15, H1, H4 |
-| Period | 2021-2026 (5 years) |
-| Session | 13:00-16:00 UTC only |
-| Spread | 0.3 pips |
-| Slippage | 0.5 pips |
-| Commission | $7/lot round-turn |
-
-### 7.2 TP/SL Scenarios to Test
-
-| SL | TP | R:R | Target WR |
-|----|----|-----|-----------|
-| 3 | 9 | 3:1 | 30% |
-| **5** | **15** | **3:1** | **30%** |
-| 7 | 21 | 3:1 | 28% |
-| 10 | 30 | 3:1 | 26% |
-
-### 7.3 Filter Scenarios
-
-| Scenario | Filters | Signals/Day | Expected WR |
-|----------|---------|-------------|-------------|
-| Baseline | None | 50+ | 15-20% |
-| Session only | Gate 1 | 20-30 | 18-22% |
-| + Higher TF | 1-2 | 10-15 | 22-28% |
-| + ADX | 1-3 | 5-10 | 25-32% |
-| + Full gate | All | 1-3 | 30-40% |
-
-### 7.4 Target Performance
-
-| Metric | Target | Minimum |
-|--------|--------|---------|
-| Win Rate | >35% | >25% |
-| Profit Factor | >1.5 | >1.0 |
-| Expectancy | >0.3R | >0.0R |
-| Max Drawdown | <15% | <25% |
-| Signals/Day | 2-5 | 1-3 |
-
----
-
-## 8. Signal Gate Pipeline (Inference)
-
+### Feature Set (Recommended ~40 features)
 ```
-1. Is it a valid session? (13:00-16:00 UTC only)         → NO → NO-TRADE
-2. Is spread < 0.5 pips?                                  → NO → NO-TRADE
-3. Is ATR(14) ratio in [0.5, 2.5]?                        → NO → NO-TRADE
-4. Is news event within ±15 min?                           → YES → NO-TRADE
-5. Is H4 trend filter satisfied?                           → NO → NO-TRADE
-6. Is H1 structure aligned?                                → NO → NO-TRADE
-7. Is M15 momentum aligned with H4?                        → NO → NO-TRADE
-8. M5 model prediction (confidence > 0.70)                 → NO → NO-TRADE
-9. Both models agree on direction?                         → NO → NO-TRADE
-                                                          ↓
-                                                  FINAL SIGNAL
-                                           (LONG/SHORT/NO-TRADE)
+Tier 1 (15): ATR(14), RSI(7), RSI(14), EMA(8)/EMA(21) cross,
+  candle_body_ratio, candle_shadow_ratio, price_position,
+  ROC_5, ROC_10, ROC_20, momentum_10, BB_width, BB_position,
+  session_overlap, volume_momentum
+
+Tier 2 (15): MACD_hist, stochastic_K, CCI_20, williams_R,
+  rolling_std_10, rolling_std_20, atr_ratio_5_20,
+  ema_50_position, linear_reg_slope_20,
+  M15_RSI, M15_ema_trend, H1_ema_trend, H4_trend_binary,
+  hour_sin, hour_cos
+
+Tier 3 (10): VWAP_deviation, OBV_momentum, bb_squeeze,
+  price_vs_session_high, price_vs_session_low,
+  atr_percentile, returns_skewness_20, returns_kurtosis_20,
+  range_ratio, body_ratio_3bar
+```
+
+### Training Configuration
+```
+Model: XGBoost + LightGBM ensemble with meta-learner
+Loss: Cross-entropy (primary), MADL (threshold optimization)
+Walk-forward: 30 windows, 6mo train / 1mo test
+Purge: 20 bars, Embargo: 20 bars
+Class handling: class_weight='balanced' + SMOTE on minority
+Normalization: RobustScaler for indicators, StandardScaler for returns
+Feature selection: VarianceThreshold → Correlation → Mutual Information → SHAP
+Confidence threshold: >= 70/100
+```
+
+### Data Preparation Pipeline
+```
+1. Fetch M5 OHLCV + spread from MT5
+2. Fetch M15, H1, H4 OHLCV for MTF features
+3. Compute 40+ features (price, momentum, volatility, session, MTF)
+4. Apply triple-barrier labeling (4.5x ATR TP, 1.5x ATR SL, 20-bar horizon)
+5. Winsorize extreme returns at 5th/95th percentile
+6. Apply RobustScaler/StandardScaler (fit on train only)
+7. VarianceThreshold → Correlation filter → MI selection
+8. Walk-forward split with purge/embargo
+9. Train ensemble, optimize threshold for profit
+10. Monitor concept drift with ADWIN + rolling IC
 ```
 
 ---
 
-## 9. Implementation Sequencing
-
-| Phase | What | Dependencies |
-|-------|------|--------------|
-| **1. Data Pipeline** | MT5 connection → pull 5 years EUR/USD M1/M5/M15/H1 + DXY data → store as Parquet | MT5 broker account |
-| **2. Feature Engineering** | Compute all Tier 1 + Tier 2 features. Unit tests for BOS/CVD detection. | Phase 1 |
-| **3. Label Generation** | Triple-barrier labeling with TP=15, SL=5, horizon=20 bars. Plot label distribution. | Phase 2 |
-| **4. Rule-Based Filters** | Session filter, ADX filter, MTF alignment, volatility gates. | Phase 3 |
-| **5. XGBoost Baseline** | Train on filtered data with walk-forward CV. Measure selective precision. | Phase 4 |
-| **6. Ensemble Stacking** | Add LightGBM + Logistic Regression + Meta-learner. | Phase 5 |
-| **7. Backtest (Realistic Costs)** | Full backtest with spread/slippage/delay. Walk-forward CV. | Phase 6 |
-| **8. Signal Output** | Telegram/Email alert system. | Phase 7 |
-
----
-
-## 10. Summary: The Path to Profitable 3:1 Signals
-
-**This is achieved through extreme selectivity + correct features + proper validation.**
-
-1. **Session Restriction**: Trade ONLY during London-NY overlap (13:00-16:00 UTC). This is non-negotiable for 3:1 TP:SL.
-
-2. **MTF Hierarchy**: H4 sets bias, H1 identifies levels, M15 confirms setup, M5 executes entry. Never trade against H4.
-
-3. **Feature Priority**: MTF alignment + ADX > 25 + RSI 40-50 + BOS + MACD. These 5 features carry the edge.
-
-4. **Confidence Scoring**: 8-factor weighted score with threshold >= 70. Only high-conviction setups qualify.
-
-5. **Ensemble Architecture**: Rule-based filter → XGBoost + LightGBM + LR → Meta-learner → Confidence gate.
-
-6. **Validation**: Walk-forward (30 windows) + purged CV + statistical significance testing. No shortcuts.
-
-7. **Mathematics**: Break-even is 25% win rate. Target 35%+ for +0.40R expectancy. Margin of safety: 10+ percentage points.
-
----
-
-## 11. Key Research Findings
-
-| Question | Answer |
-|----------|--------|
-| **How many 15+ pip moves during overlap?** | 2-4 per session (almost daily) |
-| **How many 15+ pip moves per full day?** | 5-8 total across London + NY |
-| **What % of M15 candles produce 15+ pip moves?** | ~5-10% during overlap; <2% during Asian |
-| **Is EUR/USD volatile enough for 3:1 TP:SL?** | YES — during overlap hours with 60+ pip daily ATR |
-| **Best hours for 15+ pip moves?** | 13:00-16:00 UTC (London-NY overlap) |
-| **Best days?** | Tuesday, Thursday, Friday (current regime) |
-| **Current daily ATR?** | 53-65 pips (low-vol regime, June 2026) |
-| **EUR/USD ECN spread (overlap)?** | 0.0-0.2 pips |
-| **Total cost per lot (ECN)?** | $3.50-$7.00 round-trip |
-| **Break-even win rate at 3:1?** | 25% |
-| **Target win rate?** | >35% for +0.40R expectancy |
-| **Expected signals per day?** | 1-3 (with full filtering) |
-
----
-
-## 12. Critical Success Factors
-
-1. **Never skip H4 analysis** — this is where 90% of retail traders fail
-2. **Be patient during H4 ranging markets** — force yourself to sit on hands
-3. **Focus on London-NY overlap** — EUR/USD spreads and liquidity are optimal
-4. **Journal MTF alignment data** — track whether aligned trades outperform
-5. **Accept fewer trades** — 2-4 quality setups per day is sufficient for 3:1 R:R
-6. **Walk-forward validation is non-negotiable** — without it, any backtested result is statistically meaningless
-7. **Purging and embargo prevent label leakage** — critical for triple-barrier labeling
-8. **Confidence threshold >= 70** — this is what separates high-quality signals from noise
-
----
-
-*Research completed: June 25, 2026*
-*Sources: 30+ sources including academic papers, practitioner guides, ML engineering resources (2024-2026)*
+*Research compiled: 2026-06-27*
+*Sources: Qlib documentation, MQL5 articles, ScienceDirect papers, QuantInsti research, arXiv papers, sklearn docs, TradingView strategies, walk-forward validation guides*
