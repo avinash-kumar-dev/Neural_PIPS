@@ -175,6 +175,7 @@ class MultiTimeframeFeatures:
         m15_bull = pd.Series(features['m15_rsi_bullish'])
         m15_bear = pd.Series(features['m15_rsi_bearish'])
         features['mtf_alignment'] = ((h4_bull | h4_bear).astype(int) + h1_a50.astype(int) + (m15_bull | m15_bear).astype(int)).values
+        features['h4_regime'] = (h4_bull.astype(int) - h4_bear.astype(int)).values
 
         return pd.DataFrame(features, index=m5_df.index)
 
@@ -245,7 +246,7 @@ class FeatureEngineer:
         'adx', 'plus_di', 'minus_di', 'adx_rising',
         'stoch_rsi_k', 'stoch_rsi_d',
         'volume_ratio', 'body_ratio', 'cvd_delta', 'cvd_roc_5',
-        'h4_bullish', 'h4_bearish', 'h1_above_ema50',
+        'h4_bullish', 'h4_bearish', 'h4_regime', 'h1_above_ema50',
         'm15_rsi', 'm15_rsi_bullish', 'm15_rsi_bearish',
         'mtf_alignment', 'h1_bullish_bos', 'h1_bearish_bos',
         'session_sin', 'session_cos', 'is_overlap', 'is_london', 'is_ny',

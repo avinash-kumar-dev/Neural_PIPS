@@ -1,0 +1,106 @@
+{
+  "versions": {
+    "v1_original": {
+      "description": "Walk-forward (10 windows), last window's models saved. Data leakage — tested on training data.",
+      "train_method": "walk_forward_10_windows",
+      "train_period": "2025-03-17 to 2026-05-29",
+      "test_method": "same_data_as_train (INFLATED)",
+      "files": {
+        "xgboost": "models/v1_original/xgboost.joblib",
+        "lightgbm": "models/v1_original/lightgbm.joblib",
+        "meta": "models/v1_original/meta.joblib",
+        "feature_pipeline": "models/v1_original/feature_pipeline.joblib"
+      },
+      "metrics": {
+        "walk_forward_accuracy_mean": 0.77,
+        "inflated_long_accuracy": 92.2,
+        "inflated_long_signals": 244,
+        "inflated_signals_per_day": 3.0,
+        "base_accuracy": null
+      },
+      "holdout_june_metrics": {
+        "long_accuracy": 42.9,
+        "long_signals": 14,
+        "short_accuracy": 90.2,
+        "short_signals": 122,
+        "combined_accuracy": 85.3,
+        "combined_signals": 136,
+        "base_accuracy": null
+      },
+      "issue": "Data leakage — inflated LONG accuracy. Walk-forward mean was honest at 77%.",
+      "status": "deprecated"
+    },
+    "v2_holdout": {
+      "description": "Single train/test split. Pre-June train, June 2026 holdout test. Revealed LONG is broken.",
+      "train_method": "single_split",
+      "train_period": "2025-03-17 to 2026-05-29",
+      "test_period": "2026-06-01 to 2026-06-25",
+      "train_bars": 61987,
+      "test_bars": 3735,
+      "files": {
+        "xgboost": "models/v2_holdout/xgboost.joblib",
+        "lightgbm": "models/v2_holdout/lightgbm.joblib",
+        "meta": "models/v2_holdout/meta.joblib"
+      },
+      "metrics": {
+        "base_accuracy": 87.7,
+        "long_accuracy": 0.0,
+        "long_signals": 3,
+        "short_accuracy": 88.5,
+        "short_signals": 26,
+        "combined_accuracy_at_T78": 79.3,
+        "combined_signals_at_T78": 29,
+        "signals_per_day": 1.0
+      },
+      "regime_analysis": {
+        "h4_bullish_in_long_train": 0.49,
+        "h4_bullish_in_long_test": 0.00,
+        "h4_bearish_in_long_train": 0.23,
+        "h4_bearish_in_long_test": 0.68,
+        "root_cause": "H4 regime shift — model never saw LONG + H4-bearish together in training"
+      },
+      "status": "diagnostic_only"
+    },
+    "v3_regime": {
+      "description": "Regime-conditional. Single model with h4_regime as explicit feature. Walk-forward validated.",
+      "train_method": "walk_forward_10_windows_with_regime_feature",
+      "train_period": "2025-03-17 to 2026-06-25",
+      "test_period": "2026-06-01 to 2026-06-25",
+      "n_features": 41,
+      "has_h4_regime": true,
+      "files": {
+        "xgboost": "models/v3_regime/xgboost.joblib",
+        "lightgbm": "models/v3_regime/lightgbm.joblib",
+        "meta": "models/v3_regime/meta.joblib",
+        "feature_pipeline": "models/v3_regime/feature_pipeline.joblib"
+      },
+      "metrics": {
+        "walk_forward_accuracy_mean": 0.8663,
+        "walk_forward_accuracy_std": 0.0158,
+        "walk_forward_precision_mean": 0.5421,
+        "walk_forward_recall_mean": 0.3296,
+        "walk_forward_f1_mean": 0.4083,
+        "n_windows": 9,
+        "total_train_bars": 65722,
+        "train_time_seconds": 32.4
+      },
+      "holdout_june_metrics": {
+        "base_accuracy": 94.9,
+        "short_accuracy_T78": 92.0,
+        "short_signals_T78": 25,
+        "short_accuracy_T60": 96.6,
+        "short_signals_T60": 118,
+        "long_accuracy_T78": 25.0,
+        "long_signals_T78": 4,
+        "long_accuracy_T60": 77.8,
+        "long_signals_T60": 18
+      },
+      "improvement_over_v2": {
+        "short_accuracy_T78": "+3.5% (88.5 -> 92.0)",
+        "long_accuracy_T78": "+25% (0.0 -> 25.0)",
+        "base_accuracy": "+7.2% (87.7 -> 94.9)"
+      },
+      "status": "current"
+    }
+  }
+}

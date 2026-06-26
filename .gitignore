@@ -40,8 +40,9 @@ data/eurusd/*.csv
 !data/eurusd/.gitkeep
 
 # Models (large binary files)
-models/*.joblib
-models/*.json
+models/**/*.joblib
+models/**/*.json
+!models/model_registry.json
 !models/.gitkeep
 
 # Docker
