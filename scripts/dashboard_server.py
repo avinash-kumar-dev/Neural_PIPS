@@ -72,7 +72,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({'status': 'error', 'error': 'MT5 not connected'}).encode())
                     return
 
-                df = fetcher.fetch_ohlcv(timeframe, 1)
+                df = fetcher.fetch_ohlcv(timeframe, 3)
 
                 if df is None or len(df) == 0:
                     self.wfile.write(json.dumps({'status': 'error', 'error': 'No data'}).encode())
