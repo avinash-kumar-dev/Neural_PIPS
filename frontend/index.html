@@ -178,6 +178,8 @@
 
         const overlayPrimitives = new Map();
         const signalsMap = new Map();
+        const signalPriceLines = new Map();
+        let timerPriceLine = null;
 
         class SignalOverlay {
             constructor(entryPrice, tpPrice, slPrice, isLong, startTime, endTime) {
@@ -320,6 +322,70 @@
             overlay._series = candleSeries;
             candleSeries.attachPrimitive(overlay);
             overlayPrimitives.set(signal.id, overlay);
+
+            if (!signalPriceLines.has(signal.id)) {
+                const entryLine = candleSeries.createPriceLine({
+                    price: entry, color: '#ffffff', lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: `E#${signal.id}`,
+                });
+                const tpLine = candleSeries.createPriceLine({
+                    price: tp, color: '#22c55e', lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: `TP#${signal.id}`,
+                });
+                const slLine = candleSeries.createPriceLine({
+                    price: sl, color: '#ef4444', lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: `SL#${signal.id}`,
+                });
+                signalPriceLines.set(signal.id, { entryLine, tpLine, slLine });
+            }
+        }
+
+        function removeSignalPriceLines(signalId) {
+            const lines = signalPriceLines.get(signalId);
+            if (!lines) return;
+            try {
+                candleSeries.removePriceLine(lines.entryLine);
+                candleSeries.removePriceLine(lines.tpLine);
+                candleSeries.removePriceLine(lines.slLine);
+            } catch(e) {}
+            signalPriceLines.delete(signalId);
+        }
+
+        function getCandleTimerSeconds() {
+            const now = new Date();
+            const mins = now.getUTCMinutes();
+            const secs = now.getUTCSeconds();
+            const tfMin = currentTF === 'M1' ? 1 : currentTF === 'M5' ? 5 : currentTF === 'M15' ? 15 : currentTF === 'H1' ? 60 : 240;
+            const totalSecs = mins * 60 + secs;
+            const elapsed = totalSecs % (tfMin * 60);
+            return tfMin * 60 - elapsed;
+        }
+
+        function updateCandleTimer() {
+            if (!chart || !candleSeries) return;
+            const remaining = getCandleTimerSeconds();
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+            const label = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+            try {
+                const lastBar = candleSeries.data().slice(-1)[0];
+                if (!lastBar) return;
+                const price = lastBar.close;
+
+                if (timerPriceLine) {
+                    timerPriceLine.applyOptions({ price: price, title: label });
+                } else {
+                    timerPriceLine = candleSeries.createPriceLine({
+                        price: price, color: '#3b82f6', lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Solid,
+                        axisLabelVisible: true, title: label,
+                    });
+                }
+            } catch(e) {}
         }
 
         function syncPendingOverlays(signals) {
@@ -395,6 +461,10 @@
 
         async function loadChart(tf) {
             currentTF = tf;
+            if (timerPriceLine) {
+                try { candleSeries.removePriceLine(timerPriceLine); } catch(e) {}
+                timerPriceLine = null;
+            }
             document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tf));
             try {
                 const res = await fetch(`/api/ohlcv?tf=${tf}&count=300`);
@@ -568,6 +638,7 @@
                         if (sig && sig.result !== 'pending') {
                             const endTime = sig.closed_at ? Math.floor(new Date(sig.closed_at).getTime() / 1000) : null;
                             prim.updateTimes(Math.floor(new Date(sig.timestamp).getTime() / 1000), endTime);
+                            removeSignalPriceLines(id);
                         }
                     }
                 } else {
@@ -589,6 +660,7 @@
         loadChart('M5');
         fetchAll(); setInterval(fetchAll, 5000);
         setInterval(updateLiveCandle, 5000);
+        setInterval(updateCandleTimer, 1000);
         setInterval(() => loadChart(currentTF), 60000);
         updateTableClickHandler();
         addLog('Dashboard started');
