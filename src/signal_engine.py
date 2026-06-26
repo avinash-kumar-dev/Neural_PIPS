@@ -31,6 +31,12 @@ class SignalEngine:
         if ml_pred == 0:
             return self._no_trade('model_rejected')
 
+        h4_regime = features_row.get('h4_regime', 0)
+        if h4_regime > 0 and ml_pred == 0:
+            return self._no_trade('h4_bullish_short_blocked')
+        if h4_regime < 0 and ml_pred == 1:
+            return self._no_trade('h4_bearish_long_blocked')
+
         from src.confidence_scorer import ConfidenceScorer
         scorer = ConfidenceScorer({'threshold': self.confidence_threshold})
         confidence, scores = scorer.score(features_row, raw_features_row)
@@ -45,8 +51,10 @@ class SignalEngine:
         tp_pips = min(max(atr_pips * 4.5, self.min_tp_pips), self.max_tp_pips)
         sl_pips = min(max(atr_pips * 1.5, self.min_sl_pips), self.max_sl_pips)
 
+        signal_dir = 'LONG' if ml_pred == 1 else 'SHORT'
+
         return {
-            'signal': 'LONG',
+            'signal': signal_dir,
             'confidence': confidence,
             'ml_confidence': ml_confidence,
             'tp_pips': tp_pips,
