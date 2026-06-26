@@ -3,644 +3,285 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EUR/USD Live Paper Trading Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <title>EUR/USD Live Paper Trading</title>
+    <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #111827;
-            --bg-card: #1a2332;
-            --bg-hover: #243044;
-            --text-primary: #e2e8f0;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
-            --green: #22c55e;
-            --green-bg: rgba(34,197,94,0.1);
-            --red: #ef4444;
-            --red-bg: rgba(239,68,68,0.1);
-            --blue: #3b82f6;
-            --blue-bg: rgba(59,130,246,0.1);
-            --yellow: #eab308;
-            --yellow-bg: rgba(234,179,8,0.1);
-            --border: #1e293b;
-            --border-light: #334155;
+            --bg: #0a0e17; --bg2: #111827; --bg3: #1a2332; --bg4: #243044;
+            --t1: #e2e8f0; --t2: #94a3b8; --t3: #64748b;
+            --green: #22c55e; --green-bg: rgba(34,197,94,0.1);
+            --red: #ef4444; --red-bg: rgba(239,68,68,0.1);
+            --blue: #3b82f6; --blue-bg: rgba(59,130,246,0.1);
+            --yellow: #eab308; --yellow-bg: rgba(234,179,8,0.1);
+            --border: #1e293b; --border2: #334155;
         }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; background: var(--bg); color: var(--t1); }
 
-        body {
-            font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
+        .header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 16px; font-weight: 600; }
+        .header h1 span { color: var(--blue); }
+        .header-right { display: flex; align-items: center; gap: 14px; }
+        .status-badge { display: flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 16px; font-size: 11px; font-weight: 500; }
+        .status-badge.active { background: var(--green-bg); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+        .status-badge.inactive { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+        .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .clock { font-size: 12px; color: var(--t2); }
 
-        .header {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        .main { padding: 16px 20px; max-width: 1600px; margin: 0 auto; }
 
-        .header h1 {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .header h1 span {
-            color: var(--blue);
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .status-badge {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .status-badge.active {
-            background: var(--green-bg);
-            color: var(--green);
-            border: 1px solid rgba(34,197,94,0.3);
-        }
-
-        .status-badge.inactive {
-            background: var(--red-bg);
-            color: var(--red);
-            border: 1px solid rgba(239,68,68,0.3);
-        }
-
-        .status-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: currentColor;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-
-        .clock {
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
-        .main {
-            padding: 20px 24px;
-            max-width: 1600px;
-            margin: 0 auto;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-        }
-
-        .stat-label {
-            font-size: 11px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }
-
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-        }
-
-        .stat-sub {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
+        .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 16px; }
+        .stat-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+        .stat-label { font-size: 10px; color: var(--t3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .stat-value { font-size: 20px; font-weight: 700; }
+        .stat-sub { font-size: 10px; color: var(--t3); margin-top: 2px; }
         .stat-value.green { color: var(--green); }
         .stat-value.red { color: var(--red); }
         .stat-value.blue { color: var(--blue); }
         .stat-value.yellow { color: var(--yellow); }
 
-        .content-grid {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 20px;
-        }
+        .chart-section { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; overflow: hidden; }
+        .chart-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .chart-header h2 { font-size: 12px; color: var(--t2); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .tf-buttons { display: flex; gap: 4px; }
+        .tf-btn { padding: 3px 8px; font-size: 10px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--t3); cursor: pointer; font-family: inherit; }
+        .tf-btn.active { background: var(--blue-bg); color: var(--blue); border-color: rgba(59,130,246,0.3); }
+        .tf-btn:hover { border-color: var(--blue); }
+        #chartContainer { height: 400px; }
 
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            overflow: hidden;
-        }
+        .content-grid { display: grid; grid-template-columns: 1fr 380px; gap: 16px; }
+        .card { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .card-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .card-header h2 { font-size: 12px; color: var(--t2); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .card-header .count { font-size: 10px; color: var(--t3); background: var(--bg); padding: 2px 8px; border-radius: 10px; }
 
-        .card-header {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        .signals-table { width: 100%; border-collapse: collapse; }
+        .signals-table th { padding: 8px 10px; text-align: left; font-size: 9px; color: var(--t3); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg3); font-weight: 600; }
+        .signals-table td { padding: 8px 10px; font-size: 11px; border-bottom: 1px solid var(--border); color: var(--t2); }
+        .signals-table tr:hover td { background: var(--bg4); }
+        .badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+        .badge.long { background: var(--green-bg); color: var(--green); }
+        .badge.short { background: var(--red-bg); color: var(--red); }
+        .badge.win { background: var(--green-bg); color: var(--green); }
+        .badge.loss { background: var(--red-bg); color: var(--red); }
+        .badge.pending { background: var(--yellow-bg); color: var(--yellow); }
+        .pnl-pos { color: var(--green); font-weight: 600; }
+        .pnl-neg { color: var(--red); font-weight: 600; }
+        .table-scroll { max-height: 500px; overflow-y: auto; }
+        .table-scroll::-webkit-scrollbar { width: 5px; }
+        .table-scroll::-webkit-scrollbar-track { background: var(--bg); }
+        .table-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
-        .card-header h2 {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        .sidebar { display: flex; flex-direction: column; gap: 16px; }
+        .latest-card { padding: 14px; }
+        .latest-inner { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
+        .latest-dir { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+        .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .sig-item { display: flex; justify-content: space-between; font-size: 11px; }
+        .sig-item .lbl { color: var(--t3); }
+        .sig-item .val { color: var(--t1); font-weight: 600; }
+        .conf-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+        .conf-fill { height: 100%; border-radius: 2px; }
+        .conf-fill.high { background: var(--green); }
+        .conf-fill.med { background: var(--yellow); }
+        .conf-fill.low { background: var(--red); }
 
-        .card-header .count {
-            font-size: 11px;
-            color: var(--text-muted);
-            background: var(--bg-primary);
-            padding: 2px 8px;
-            border-radius: 10px;
-        }
+        .equity-wrap { padding: 14px; height: 180px; }
+        #equityChart { width: 100%; height: 100%; }
 
-        .signals-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .signals-table th {
-            padding: 10px 12px;
-            text-align: left;
-            font-size: 10px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            background: var(--bg-card);
-            font-weight: 600;
-        }
-
-        .signals-table td {
-            padding: 10px 12px;
-            font-size: 12px;
-            border-bottom: 1px solid var(--border);
-            color: var(--text-secondary);
-        }
-
-        .signals-table tr:hover td {
-            background: var(--bg-hover);
-        }
-
-        .signals-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .signal-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .signal-badge.long {
-            background: var(--green-bg);
-            color: var(--green);
-        }
-
-        .signal-badge.short {
-            background: var(--red-bg);
-            color: var(--red);
-        }
-
-        .result-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .result-badge.win {
-            background: var(--green-bg);
-            color: var(--green);
-        }
-
-        .result-badge.loss {
-            background: var(--red-bg);
-            color: var(--red);
-        }
-
-        .result-badge.pending {
-            background: var(--yellow-bg);
-            color: var(--yellow);
-        }
-
-        .pnl-positive { color: var(--green); font-weight: 600; }
-        .pnl-negative { color: var(--red); font-weight: 600; }
-
-        .table-scroll {
-            max-height: 600px;
-            overflow-y: auto;
-        }
-
-        .table-scroll::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .table-scroll::-webkit-scrollbar-track {
-            background: var(--bg-primary);
-        }
-
-        .table-scroll::-webkit-scrollbar-thumb {
-            background: var(--border-light);
-            border-radius: 3px;
-        }
-
-        .chart-container {
-            padding: 16px;
-            height: 300px;
-        }
-
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .equity-chart {
-            padding: 16px;
-            height: 200px;
-        }
-
-        .latest-signal {
-            padding: 16px;
-        }
-
-        .latest-signal-card {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-        }
-
-        .latest-signal-card .direction {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .signal-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-
-        .signal-detail {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-        }
-
-        .signal-detail .label {
-            color: var(--text-muted);
-        }
-
-        .signal-detail .value {
-            color: var(--text-primary);
-            font-weight: 600;
-        }
-
-        .confidence-bar {
-            height: 4px;
-            background: var(--border);
-            border-radius: 2px;
-            margin-top: 12px;
-            overflow: hidden;
-        }
-
-        .confidence-fill {
-            height: 100%;
-            border-radius: 2px;
-            transition: width 0.3s;
-        }
-
-        .confidence-fill.high { background: var(--green); }
-        .confidence-fill.medium { background: var(--yellow); }
-        .confidence-fill.low { background: var(--red); }
-
-        .log-panel {
-            padding: 16px;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-
-        .log-entry {
-            font-size: 11px;
-            color: var(--text-muted);
-            padding: 4px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
+        .log-panel { padding: 14px; max-height: 200px; overflow-y: auto; }
+        .log-entry { font-size: 10px; color: var(--t3); padding: 3px 0; border-bottom: 1px solid var(--border); }
         .log-entry:last-child { border-bottom: none; }
+        .log-entry .time { margin-right: 6px; }
+        .log-entry .msg { color: var(--t2); }
 
-        .log-entry .time {
-            color: var(--text-muted);
-            margin-right: 8px;
-        }
+        .empty { text-align: center; padding: 40px 16px; color: var(--t3); }
+        .empty h3 { font-size: 13px; color: var(--t2); margin-bottom: 6px; }
+        .empty p { font-size: 11px; }
 
-        .log-entry .msg {
-            color: var(--text-secondary);
-        }
-
-        .refresh-indicator {
-            font-size: 11px;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .spinner {
-            width: 12px;
-            height: 12px;
-            border: 2px solid var(--border);
-            border-top-color: var(--blue);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            display: none;
-        }
-
-        .spinner.active { display: block; }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-muted);
-        }
-
-        .empty-state .icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            opacity: 0.3;
-        }
-
-        .empty-state h3 {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-        }
-
-        .empty-state p {
-            font-size: 12px;
-        }
-
-        @media (max-width: 1200px) {
-            .stats-grid { grid-template-columns: repeat(3, 1fr); }
-            .content-grid { grid-template-columns: 1fr; }
-        }
-
-        @media (max-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-        }
+        @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } .content-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <div class="header">
         <h1><span>EUR/USD</span> Live Paper Trading</h1>
         <div class="header-right">
-            <div class="refresh-indicator">
-                <div class="spinner" id="spinner"></div>
-                <span id="refreshStatus">Auto-refresh: 5s</span>
-            </div>
-            <div class="status-badge active" id="statusBadge">
-                <div class="status-dot"></div>
-                <span id="statusText">Connecting...</span>
-            </div>
+            <div class="status-badge active" id="statusBadge"><div class="dot"></div><span id="statusText">Connecting...</span></div>
             <div class="clock" id="clock"></div>
         </div>
     </div>
-
     <div class="main">
         <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Total Signals</div>
-                <div class="stat-value blue" id="totalSignals">0</div>
-                <div class="stat-sub" id="signalRate">0.0/day</div>
+            <div class="stat-card"><div class="stat-label">Signals</div><div class="stat-value blue" id="totalSignals">0</div><div class="stat-sub" id="signalRate">0.0/day</div></div>
+            <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value green" id="winRate">--</div><div class="stat-sub" id="winCount">0W / 0L</div></div>
+            <div class="stat-card"><div class="stat-label">Total PnL</div><div class="stat-value" id="totalPnl">0.0</div><div class="stat-sub">pips</div></div>
+            <div class="stat-card"><div class="stat-label">Avg Confidence</div><div class="stat-value blue" id="avgConfidence">--</div><div class="stat-sub">/100</div></div>
+            <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value yellow" id="pendingCount">0</div><div class="stat-sub">open</div></div>
+            <div class="stat-card"><div class="stat-label">TP:SL</div><div class="stat-value" id="avgTpsl">--</div><div class="stat-sub">avg ratio</div></div>
+        </div>
+
+        <div class="chart-section">
+            <div class="chart-header">
+                <h2>M5 Price Chart</h2>
+                <div class="tf-buttons">
+                    <button class="tf-btn" data-tf="M1">M1</button>
+                    <button class="tf-btn active" data-tf="M5">M5</button>
+                    <button class="tf-btn" data-tf="M15">M15</button>
+                    <button class="tf-btn" data-tf="H1">H1</button>
+                    <button class="tf-btn" data-tf="H4">H4</button>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Win Rate</div>
-                <div class="stat-value green" id="winRate">--</div>
-                <div class="stat-sub" id="winCount">0W / 0L</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Total PnL</div>
-                <div class="stat-value" id="totalPnl">0.0</div>
-                <div class="stat-sub">pips</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Avg Confidence</div>
-                <div class="stat-value blue" id="avgConfidence">--</div>
-                <div class="stat-sub">/100</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Pending</div>
-                <div class="stat-value yellow" id="pendingCount">0</div>
-                <div class="stat-sub">signals open</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">TP:SL Ratio</div>
-                <div class="stat-value" id="avgTpsl">--</div>
-                <div class="stat-sub">avg ratio</div>
-            </div>
+            <div id="chartContainer"></div>
         </div>
 
         <div class="content-grid">
             <div class="card">
-                <div class="card-header">
-                    <h2>Signal History</h2>
-                    <span class="count" id="historyCount">0 signals</span>
-                </div>
+                <div class="card-header"><h2>Signal History</h2><span class="count" id="historyCount">0</span></div>
                 <div class="table-scroll" id="tableScroll">
                     <table class="signals-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Time (UTC)</th>
-                                <th>Dir</th>
-                                <th>Entry</th>
-                                <th>TP (pips)</th>
-                                <th>SL (pips)</th>
-                                <th>Ratio</th>
-                                <th>Confidence</th>
-                                <th>Result</th>
-                                <th>PnL</th>
-                            </tr>
-                        </thead>
-                        <tbody id="signalsBody">
-                        </tbody>
+                        <thead><tr><th>#</th><th>Time (UTC)</th><th>Dir</th><th>Entry</th><th>TP</th><th>SL</th><th>Ratio</th><th>Conf</th><th>Result</th><th>PnL</th></tr></thead>
+                        <tbody id="signalsBody"></tbody>
                     </table>
-                    <div class="empty-state" id="emptyState">
-                        <div class="icon">&#x1f4ca;</div>
-                        <h3>No signals yet</h3>
-                        <p>Signals will appear here during London-NY overlap (13:00-16:00 UTC)</p>
-                    </div>
+                    <div class="empty" id="emptyState"><h3>No signals yet</h3><p>Signals appear during 13:00-16:00 UTC</p></div>
                 </div>
             </div>
-
             <div class="sidebar">
                 <div class="card">
-                    <div class="card-header">
-                        <h2>Latest Signal</h2>
-                    </div>
-                    <div class="latest-signal">
-                        <div class="latest-signal-card" id="latestSignal">
-                            <div class="empty-state" style="padding: 20px;">
-                                <p>Waiting for first signal...</p>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="card-header"><h2>Latest Signal</h2></div>
+                    <div class="latest-card"><div class="latest-inner" id="latestSignal"><div class="empty" style="padding:16px"><p>Waiting...</p></div></div></div>
                 </div>
-
                 <div class="card">
-                    <div class="card-header">
-                        <h2>Equity Curve</h2>
-                    </div>
-                    <div class="equity-chart">
-                        <canvas id="equityChart"></canvas>
-                    </div>
+                    <div class="card-header"><h2>Equity Curve</h2></div>
+                    <div class="equity-wrap"><canvas id="equityChart"></canvas></div>
                 </div>
-
                 <div class="card">
-                    <div class="card-header">
-                        <h2>Activity Log</h2>
-                    </div>
-                    <div class="log-panel" id="logPanel">
-                        <div class="log-entry">
-                            <span class="time">--:--:--</span>
-                            <span class="msg">Dashboard initialized</span>
-                        </div>
-                    </div>
+                    <div class="card-header"><h2>Activity Log</h2></div>
+                    <div class="log-panel" id="logPanel"><div class="log-entry"><span class="time">--:--</span><span class="msg">Dashboard initialized</span></div></div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let equityChart = null;
+        let chart, candleSeries, volumeSeries, markerSeries;
         let lastSignalCount = 0;
         let logs = [];
+        let currentTF = 'M5';
+        let equityChart = null;
 
         function updateClock() {
             const now = new Date();
             const utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
             const pkt = new Date(utc.getTime() + 5 * 3600000);
-
-            const utcStr = utc.toISOString().slice(11, 19);
-            const pktStr = pkt.toISOString().slice(11, 19);
-
             document.getElementById('clock').textContent =
-                `${utcStr} UTC | ${pktStr} PKT`;
+                utc.toISOString().slice(11,19) + ' UTC | ' + pkt.toISOString().slice(11,19) + ' PKT';
         }
 
         function addLog(msg) {
-            const now = new Date();
-            const time = now.toISOString().slice(11, 19);
-            logs.unshift({ time, msg });
-            if (logs.length > 50) logs.pop();
-
-            const panel = document.getElementById('logPanel');
-            panel.innerHTML = logs.map(l =>
-                `<div class="log-entry"><span class="time">${l.time}</span><span class="msg">${l.msg}</span></div>`
+            const t = new Date().toISOString().slice(11,19);
+            logs.unshift({t, msg});
+            if (logs.length > 30) logs.pop();
+            document.getElementById('logPanel').innerHTML = logs.map(l =>
+                `<div class="log-entry"><span class="time">${l.t}</span><span class="msg">${l.msg}</span></div>`
             ).join('');
         }
 
         function initChart() {
-            const ctx = document.getElementById('equityChart').getContext('2d');
-            equityChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Cumulative PnL (pips)',
-                        data: [],
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59,130,246,0.1)',
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 3,
-                        pointBackgroundColor: '#3b82f6',
-                        borderWidth: 2,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                    },
-                    scales: {
-                        x: {
-                            display: true,
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: {
-                                color: '#64748b',
-                                font: { size: 10, family: 'monospace' },
-                                maxTicksLimit: 8,
-                            }
-                        },
-                        y: {
-                            display: true,
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: {
-                                color: '#64748b',
-                                font: { size: 10, family: 'monospace' },
-                            }
-                        }
-                    }
-                }
+            chart = LightweightCharts.createChart(document.getElementById('chartContainer'), {
+                layout: { background: { color: '#1a2332' }, textColor: '#94a3b8', fontSize: 11 },
+                grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                rightPriceScale: { borderColor: '#1e293b' },
+                timeScale: { borderColor: '#1e293b', timeVisible: true, secondsVisible: false },
+                handleScroll: { vertTouchDrag: false },
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#22c55e', downColor: '#ef4444',
+                borderUpColor: '#22c55e', borderDownColor: '#ef4444',
+                wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+            });
+
+            volumeSeries = chart.addHistogramSeries({
+                priceFormat: { type: 'volume' },
+                priceScaleId: 'vol',
+            });
+            chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
+
+            markerSeries = candleSeries;
+
+            window.addEventListener('resize', () => {
+                chart.applyOptions({ width: document.getElementById('chartContainer').clientWidth });
             });
         }
 
-        function updateChart(signals) {
-            const resolved = signals.filter(s => s.result === 'WIN' || s.result === 'LOSS');
-            let cumPnl = 0;
-            const labels = [];
-            const data = [];
+        async function loadChart(tf) {
+            currentTF = tf;
+            document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tf));
+            try {
+                const res = await fetch(`/api/ohlcv?tf=${tf}&count=300`);
+                const data = await res.json();
+                if (data.status !== 'ok') { addLog(`Chart error: ${data.error}`); return; }
 
-            resolved.forEach((s, i) => {
-                cumPnl += s.pnl_pips || 0;
-                labels.push(`#${s.id}`);
-                data.push(cumPnl);
+                const candles = data.candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+                const volumes = data.candles.map(c => ({
+                    time: c.time,
+                    value: c.volume,
+                    color: c.close >= c.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+                }));
+
+                candleSeries.setData(candles);
+                volumeSeries.setData(volumes);
+                chart.timeScale().fitContent();
+                addLog(`Chart loaded: ${tf} (${data.count} bars)`);
+
+                await addSignalMarkers();
+            } catch(e) { addLog(`Chart fetch error: ${e.message}`); }
+        }
+
+        async function addSignalMarkers() {
+            try {
+                const res = await fetch('/api/signals');
+                const data = await res.json();
+                if (!data.signals || data.signals.length === 0) return;
+
+                const markers = data.signals
+                    .filter(s => s.timestamp)
+                    .map(s => {
+                        const ts = Math.floor(new Date(s.timestamp).getTime() / 1000);
+                        const isLong = s.signal === 'LONG';
+                        let color = '#3b82f6';
+                        let shape = 'arrowUp';
+                        if (s.result === 'WIN') { color = '#22c55e'; }
+                        else if (s.result === 'LOSS') { color = '#ef4444'; }
+                        else if (s.signal === 'SHORT') { shape = 'arrowDown'; color = s.result === 'WIN' ? '#22c55e' : s.result === 'LOSS' ? '#ef4444' : '#eab308'; }
+
+                        return {
+                            time: ts,
+                            position: isLong ? 'belowBar' : 'aboveBar',
+                            color: color,
+                            shape: shape,
+                            text: `${s.signal} ${s.confidence}`,
+                        };
+                    })
+                    .sort((a, b) => a.time - b.time);
+
+                candleSeries.setMarkers(markers);
+            } catch(e) {}
+        }
+
+        function initEquityChart() {
+            const ctx = document.getElementById('equityChart').getContext('2d');
+            equityChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 1.5 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 9, family: 'monospace' } } } }
+                }
             });
-
-            equityChart.data.labels = labels;
-            equityChart.data.datasets[0].data = data;
-            equityChart.update('none');
         }
 
         function updateStats(signals) {
@@ -649,179 +290,106 @@
             const losses = signals.filter(s => s.result === 'LOSS').length;
             const pending = signals.filter(s => s.result === 'pending').length;
             const resolved = wins + losses;
-
-            const totalPnl = signals.reduce((sum, s) => sum + (s.pnl_pips || 0), 0);
-            const avgConf = total > 0
-                ? (signals.reduce((sum, s) => sum + s.confidence, 0) / total).toFixed(1)
-                : '--';
-            const avgTpsl = total > 0
-                ? (signals.reduce((sum, s) => sum + (s.tp_sl_ratio || 0), 0) / total).toFixed(1)
-                : '--';
-
+            const totalPnl = signals.reduce((s, x) => s + (x.pnl_pips || 0), 0);
+            const avgConf = total > 0 ? (signals.reduce((s, x) => s + x.confidence, 0) / total).toFixed(1) : '--';
+            const avgTpsl = total > 0 ? (signals.reduce((s, x) => s + (x.tp_sl_ratio || 0), 0) / total).toFixed(1) : '--';
             const winRate = resolved > 0 ? ((wins / resolved) * 100).toFixed(1) : '--';
 
             document.getElementById('totalSignals').textContent = total;
-            document.getElementById('winRate').textContent = winRate === '--' ? '--' : `${winRate}%`;
-            document.getElementById('winRate').className = `stat-value ${winRate !== '--' && parseFloat(winRate) >= 50 ? 'green' : 'red'}`;
-            document.getElementById('winCount').textContent = `${wins}W / ${losses}L`;
-            document.getElementById('totalPnl').textContent = totalPnl >= 0 ? `+${totalPnl.toFixed(1)}` : totalPnl.toFixed(1);
-            document.getElementById('totalPnl').className = `stat-value ${totalPnl >= 0 ? 'green' : 'red'}`;
+            document.getElementById('winRate').textContent = winRate === '--' ? '--' : winRate + '%';
+            document.getElementById('winRate').className = 'stat-value ' + (winRate !== '--' && parseFloat(winRate) >= 50 ? 'green' : 'red');
+            document.getElementById('winCount').textContent = wins + 'W / ' + losses + 'L';
+            document.getElementById('totalPnl').textContent = (totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(1);
+            document.getElementById('totalPnl').className = 'stat-value ' + (totalPnl >= 0 ? 'green' : 'red');
             document.getElementById('avgConfidence').textContent = avgConf;
             document.getElementById('pendingCount').textContent = pending;
             document.getElementById('avgTpsl').textContent = avgTpsl;
 
             const days = total > 0 ? Math.max(1, Math.ceil((new Date(signals[signals.length-1].timestamp) - new Date(signals[0].timestamp)) / 86400000)) : 1;
-            document.getElementById('signalRate').textContent = `${(total / days).toFixed(1)}/day`;
-            document.getElementById('historyCount').textContent = `${total} signals`;
+            document.getElementById('signalRate').textContent = (total / days).toFixed(1) + '/day';
+            document.getElementById('historyCount').textContent = total;
         }
 
-        function updateLatestSignal(signal) {
-            const container = document.getElementById('latestSignal');
-            if (!signal) return;
+        function updateEquity(signals) {
+            const resolved = signals.filter(s => s.result === 'WIN' || s.result === 'LOSS');
+            let cum = 0;
+            const labels = [], data = [];
+            resolved.forEach(s => { cum += s.pnl_pips || 0; labels.push('#' + s.id); data.push(cum); });
+            equityChart.data.labels = labels;
+            equityChart.data.datasets[0].data = data;
+            equityChart.update('none');
+        }
 
-            const confClass = signal.confidence >= 85 ? 'high' : signal.confidence >= 70 ? 'medium' : 'low';
-            const resultClass = signal.result === 'WIN' ? 'win' : signal.result === 'LOSS' ? 'loss' : 'pending';
-            const resultText = signal.result === 'pending' ? 'PENDING' : signal.result;
-            const pnlText = signal.pnl_pips > 0 ? `+${signal.pnl_pips.toFixed(1)}` : signal.pnl_pips < 0 ? signal.pnl_pips.toFixed(1) : '--';
-
-            container.innerHTML = `
-                <div class="direction" style="color: ${signal.signal === 'LONG' ? 'var(--green)' : 'var(--red)'}">
-                    ${signal.signal}
+        function updateLatest(s) {
+            if (!s) return;
+            const rc = s.result === 'WIN' ? 'win' : s.result === 'LOSS' ? 'loss' : 'pending';
+            const rt = s.result === 'pending' ? 'PENDING' : s.result;
+            const pnl = s.pnl_pips > 0 ? '+' + s.pnl_pips.toFixed(1) : s.pnl_pips < 0 ? s.pnl_pips.toFixed(1) : '--';
+            const cc = s.confidence >= 85 ? 'high' : s.confidence >= 70 ? 'med' : 'low';
+            document.getElementById('latestSignal').innerHTML = `
+                <div class="latest-dir" style="color:${s.signal==='LONG'?'var(--green)':'var(--red)'}">${s.signal}</div>
+                <div class="sig-grid">
+                    <div class="sig-item"><span class="lbl">Entry</span><span class="val">${s.entry_price.toFixed(5)}</span></div>
+                    <div class="sig-item"><span class="lbl">Confidence</span><span class="val">${s.confidence}/100</span></div>
+                    <div class="sig-item"><span class="lbl">TP</span><span class="val" style="color:var(--green)">${s.tp_pips} pips</span></div>
+                    <div class="sig-item"><span class="lbl">SL</span><span class="val" style="color:var(--red)">${s.sl_pips} pips</span></div>
+                    <div class="sig-item"><span class="lbl">Ratio</span><span class="val">1:${s.tp_sl_ratio}</span></div>
+                    <div class="sig-item"><span class="lbl">ATR</span><span class="val">${s.atr_pips} pips</span></div>
+                    <div class="sig-item"><span class="lbl">Result</span><span class="badge ${rc}">${rt}</span></div>
+                    <div class="sig-item"><span class="lbl">PnL</span><span class="val ${s.pnl_pips>0?'pnl-pos':s.pnl_pips<0?'pnl-neg':''}">${pnl}</span></div>
                 </div>
-                <div class="signal-details">
-                    <div class="signal-detail">
-                        <span class="label">Entry</span>
-                        <span class="value">${signal.entry_price.toFixed(5)}</span>
-                    </div>
-                    <div class="signal-detail">
-                        <span class="label">Confidence</span>
-                        <span class="value">${signal.confidence}/100</span>
-                    </div>
-                    <div class="signal-detail">
-                        <span class="label">TP</span>
-                        <span class="value" style="color: var(--green)">${signal.tp_pips} pips</span>
-                    </div>
-                    <div class="signal-detail">
-                        <span class="label">SL</span>
-                        <span class="value" style="color: var(--red)">${signal.sl_pips} pips</span>
-                    </div>
-                    <div class="signal-detail">
-                        <span class="label">Ratio</span>
-                        <span class="value">1:${signal.tp_sl_ratio}</span>
-                    </div>
-                    <div class="signal-detail">
-                        <span class="label">ATR</span>
-                        <span class="value">${signal.atr_pips} pips</span>
-                    </div>
-                    <div class="signal-detail">
-                        <span class="label">Result</span>
-                        <span class="result-badge ${resultClass}">${resultText}</span>
-                    </div>
-                    <div class="signal-detail">
-                        <span class="label">PnL</span>
-                        <span class="value ${signal.pnl_pips > 0 ? 'pnl-positive' : signal.pnl_pips < 0 ? 'pnl-negative' : ''}">${pnlText} pips</span>
-                    </div>
-                </div>
-                <div class="confidence-bar">
-                    <div class="confidence-fill ${confClass}" style="width: ${signal.confidence}%"></div>
-                </div>
-            `;
+                <div class="conf-bar"><div class="conf-fill ${cc}" style="width:${s.confidence}%"></div></div>`;
         }
 
         function renderTable(signals) {
             const tbody = document.getElementById('signalsBody');
             const empty = document.getElementById('emptyState');
-
-            if (signals.length === 0) {
-                tbody.innerHTML = '';
-                empty.style.display = 'block';
-                return;
-            }
-
+            if (!signals.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
             empty.style.display = 'none';
-
             const sorted = [...signals].reverse();
             tbody.innerHTML = sorted.map(s => {
-                const time = s.timestamp.replace('T', ' ').slice(0, 19);
-                const resultClass = s.result === 'WIN' ? 'win' : s.result === 'LOSS' ? 'loss' : 'pending';
-                const resultText = s.result === 'pending' ? 'PENDING' : s.result;
-                const pnlClass = s.pnl_pips > 0 ? 'pnl-positive' : s.pnl_pips < 0 ? 'pnl-negative' : '';
-                const pnlText = s.pnl_pips > 0 ? `+${s.pnl_pips.toFixed(1)}` : s.pnl_pips < 0 ? s.pnl_pips.toFixed(1) : '--';
-                const dirClass = s.signal === 'LONG' ? 'long' : 'short';
-
-                return `<tr>
-                    <td>${s.id}</td>
-                    <td>${time}</td>
-                    <td><span class="signal-badge ${dirClass}">${s.signal}</span></td>
-                    <td>${s.entry_price.toFixed(5)}</td>
-                    <td style="color: var(--green)">${s.tp_pips}</td>
-                    <td style="color: var(--red)">${s.sl_pips}</td>
-                    <td>1:${s.tp_sl_ratio}</td>
-                    <td>${s.confidence}</td>
-                    <td><span class="result-badge ${resultClass}">${resultText}</span></td>
-                    <td class="${pnlClass}">${pnlText}</td>
-                </tr>`;
+                const t = s.timestamp.replace('T',' ').slice(0,19);
+                const rc = s.result === 'WIN' ? 'win' : s.result === 'LOSS' ? 'loss' : 'pending';
+                const rt = s.result === 'pending' ? 'PENDING' : s.result;
+                const pnl = s.pnl_pips > 0 ? '+' + s.pnl_pips.toFixed(1) : s.pnl_pips < 0 ? s.pnl_pips.toFixed(1) : '--';
+                const pc = s.pnl_pips > 0 ? 'pnl-pos' : s.pnl_pips < 0 ? 'pnl-neg' : '';
+                return `<tr><td>${s.id}</td><td>${t}</td><td><span class="badge ${s.signal==='LONG'?'long':'short'}">${s.signal}</span></td><td>${s.entry_price.toFixed(5)}</td><td style="color:var(--green)">${s.tp_pips}</td><td style="color:var(--red)">${s.sl_pips}</td><td>1:${s.tp_sl_ratio}</td><td>${s.confidence}</td><td><span class="badge ${rc}">${rt}</span></td><td class="${pc}">${pnl}</td></tr>`;
             }).join('');
         }
 
-        async function fetchSignals() {
-            const spinner = document.getElementById('spinner');
-            spinner.classList.add('active');
-
+        async function fetchAll() {
             try {
                 const res = await fetch('/api/signals');
                 const data = await res.json();
-
-                const statusBadge = document.getElementById('statusBadge');
-                const statusText = document.getElementById('statusText');
-
                 if (data.status === 'ok') {
-                    statusBadge.className = 'status-badge active';
-                    statusText.textContent = 'Connected';
-
+                    document.getElementById('statusBadge').className = 'status-badge active';
+                    document.getElementById('statusText').textContent = 'Connected';
                     renderTable(data.signals);
                     updateStats(data.signals);
-                    updateChart(data.signals);
-
-                    if (data.signals.length > 0) {
-                        updateLatestSignal(data.signals[data.signals.length - 1]);
-                    }
-
-                    if (data.signals.length > lastSignalCount && lastSignalCount > 0) {
-                        addLog(`New signal #${data.signals.length} received`);
-                    }
+                    updateEquity(data.signals);
+                    if (data.signals.length > 0) updateLatest(data.signals[data.signals.length - 1]);
+                    if (data.signals.length > lastSignalCount && lastSignalCount > 0) { addLog('New signal #' + data.signals.length); await addSignalMarkers(); }
                     lastSignalCount = data.signals.length;
                 } else {
-                    statusBadge.className = 'status-badge inactive';
-                    statusText.textContent = 'Disconnected';
-                    addLog(`Error: ${data.error || 'unknown'}`);
+                    document.getElementById('statusBadge').className = 'status-badge inactive';
+                    document.getElementById('statusText').textContent = 'Error';
                 }
-            } catch (e) {
+            } catch(e) {
                 document.getElementById('statusBadge').className = 'status-badge inactive';
                 document.getElementById('statusText').textContent = 'Offline';
-                addLog(`Connection error: ${e.message}`);
             }
-
-            spinner.classList.remove('active');
         }
 
-        async function checkSession() {
-            try {
-                const res = await fetch('/api/session');
-                const data = await res.json();
-                if (data.in_session) {
-                    addLog(`Session active (${data.utc_hour}:00 UTC)`);
-                }
-            } catch (e) {}
-        }
+        document.querySelectorAll('.tf-btn').forEach(btn => {
+            btn.addEventListener('click', () => loadChart(btn.dataset.tf));
+        });
 
-        updateClock();
-        setInterval(updateClock, 1000);
-        initChart();
-        fetchSignals();
-        setInterval(fetchSignals, 5000);
-        addLog('Dashboard started, polling every 5s');
-        checkSession();
+        updateClock(); setInterval(updateClock, 1000);
+        initChart(); initEquityChart();
+        loadChart('M5');
+        fetchAll(); setInterval(fetchAll, 5000);
+        setInterval(() => loadChart(currentTF), 30000);
+        addLog('Dashboard started');
     </script>
 </body>
 </html>

@@ -25,7 +25,7 @@ running = True
 def handle_signal(signum, frame):
     global running
     running = False
-    print("\nStopping...")
+    print("\nGracefully shutting down...")
 
 
 signal.signal(signal.SIGINT, handle_signal)
