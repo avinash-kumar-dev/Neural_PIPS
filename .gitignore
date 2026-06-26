@@ -1,0 +1,59 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (too large for git)
+data/eurusd/M5/
+data/eurusd/M15/
+data/eurusd/H1/
+data/eurusd/H4/
+data/eurusd/*.parquet
+data/eurusd/*.csv
+!data/eurusd/.gitkeep
+
+# Models (large binary files)
+models/*.joblib
+models/*.json
+!models/.gitkeep
+
+# Docker
+mt5-data/
+
+# Logs
+*.log
+
+# Junk / temp files
+.commandcode/
+image.png
+other_agent_reasrch.md
+temp.txt
+xauusd_scalping_system_architecture.png
+live_signals.json

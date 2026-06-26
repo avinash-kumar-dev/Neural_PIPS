@@ -1,0 +1,16 @@
+services:
+  mt5:
+    image: gmag11/metatrader5_vnc:2.3
+    container_name: mt5
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - mt5-data:/config
+
+volumes:
+  mt5-data:
