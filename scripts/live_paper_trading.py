@@ -58,6 +58,18 @@ def check_signal_outcome(signal_entry, m5_df):
     if signal_entry.get('result') != 'pending':
         return signal_entry
 
+    if 'tp_price' not in signal_entry or 'sl_price' not in signal_entry:
+        entry_price = signal_entry.get('entry_price', 0)
+        direction = signal_entry.get('signal', 'LONG')
+        tp_pips = signal_entry['tp_pips']
+        sl_pips = signal_entry['sl_pips']
+        if direction == 'LONG':
+            signal_entry['tp_price'] = round(entry_price + tp_pips / 10000, 5)
+            signal_entry['sl_price'] = round(entry_price - sl_pips / 10000, 5)
+        else:
+            signal_entry['tp_price'] = round(entry_price - tp_pips / 10000, 5)
+            signal_entry['sl_price'] = round(entry_price + sl_pips / 10000, 5)
+
     signal_time = pd.to_datetime(signal_entry['timestamp'])
     entry_price = signal_entry.get('entry_price', 0)
     tp_pips = signal_entry['tp_pips']
@@ -125,6 +137,13 @@ def run_check(fetcher, engineer, pipeline, models, meta_model, scorer, engine):
 
     entry_price = m5_df['close'].iloc[-1]
 
+    if direction == 'LONG':
+        tp_price = round(entry_price + tp_pips / 10000, 5)
+        sl_price = round(entry_price - sl_pips / 10000, 5)
+    else:
+        tp_price = round(entry_price - tp_pips / 10000, 5)
+        sl_price = round(entry_price + sl_pips / 10000, 5)
+
     signal = {
         'id': len(load_signals()) + 1,
         'signal': direction,
@@ -135,6 +154,8 @@ def run_check(fetcher, engineer, pipeline, models, meta_model, scorer, engine):
         'tp_sl_ratio': round(tp_pips / sl_pips, 1),
         'atr_pips': round(atr_pips, 1),
         'entry_price': round(entry_price, 5),
+        'tp_price': tp_price,
+        'sl_price': sl_price,
         'timestamp': str(m5_df['time'].iloc[-1]),
         'scores': {k: round(v, 1) for k, v in scores.items()},
         'result': 'pending',
@@ -220,8 +241,8 @@ def main():
             print(f"  Direction:  {signal_obj['signal']}")
             print(f"  Confidence: {signal_obj['confidence']}/100")
             print(f"  Entry:      {signal_obj['entry_price']}")
-            print(f"  TP:         {signal_obj['tp_pips']} pips ({signal_obj['entry_price'] + signal_obj['tp_pips']/10000:.5f})")
-            print(f"  SL:         {signal_obj['sl_pips']} pips ({signal_obj['entry_price'] - signal_obj['sl_pips']/10000:.5f})")
+            print(f"  TP:         {signal_obj['tp_pips']} pips ({signal_obj['tp_price']})")
+            print(f"  SL:         {signal_obj['sl_pips']} pips ({signal_obj['sl_price']})")
             print(f"  Ratio:      1:{signal_obj['tp_sl_ratio']}")
             print(f"  ATR:        {signal_obj['atr_pips']} pips")
             print(f"  Scores:     {signal_obj['scores']}")

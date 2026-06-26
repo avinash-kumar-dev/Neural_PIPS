@@ -164,12 +164,188 @@
         </div>
     </div>
 
+    <style>
+        .signals-table tr { cursor: pointer; }
+        .signals-table tr:hover td { background: var(--bg4); }
+        .signals-table tr.selected td { background: rgba(59,130,246,0.15); }
+    </style>
     <script>
         let chart, candleSeries, volumeSeries, markerSeries;
         let lastSignalCount = 0;
         let logs = [];
         let currentTF = 'M5';
         let equityChart = null;
+
+        const overlayPrimitives = new Map();
+        const signalsMap = new Map();
+
+        class SignalOverlay {
+            constructor(entryPrice, tpPrice, slPrice, isLong, startTime, endTime) {
+                this._entry = entryPrice;
+                this._tp = tpPrice;
+                this._sl = slPrice;
+                this._isLong = isLong;
+                this._start = startTime;
+                this._end = endTime;
+                this._series = null;
+                this._requestUpdate = null;
+            }
+
+            updateTimes(startTime, endTime) {
+                this._start = startTime;
+                this._end = endTime;
+                if (this._requestUpdate) this._requestUpdate();
+            }
+
+            attached() {
+                this._series = this._series;
+            }
+
+            requestUpdate() {
+                this._requestUpdate = () => {};
+            }
+
+            detached() {
+                this._series = null;
+            }
+
+            updateAllViews() {}
+
+            paneViews() {
+                const self = this;
+                return [{
+                    zOrder: 'bottom',
+                    renderer() {
+                        return {
+                            draw(target) {
+                                const series = candleSeries;
+                                const timeScale = chart.timeScale();
+                                const entryY = series.priceToCoordinate(self._entry);
+                                const tpY = series.priceToCoordinate(self._tp);
+                                const slY = series.priceToCoordinate(self._sl);
+                                if (entryY === null || tpY === null || slY === null) return;
+
+                                let x1 = timeScale.timeToCoordinate(self._start);
+                                let x2 = self._end
+                                    ? timeScale.timeToCoordinate(self._end)
+                                    : timeScale.width();
+                                if (x1 === null) x1 = 0;
+                                if (x2 === null) x2 = timeScale.width();
+                                if (x1 >= x2) return;
+
+                                target.useMediaCoordinateSpace(({ context: ctx }) => {
+                                    const greenColor = self._isLong ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.25)';
+                                    const redColor = 'rgba(239,68,68,0.25)';
+
+                                    if (self._isLong) {
+                                        ctx.fillStyle = greenColor;
+                                        ctx.fillRect(x1, tpY, x2 - x1, entryY - tpY);
+                                        ctx.fillStyle = redColor;
+                                        ctx.fillRect(x1, entryY, x2 - x1, slY - entryY);
+                                    } else {
+                                        ctx.fillStyle = redColor;
+                                        ctx.fillRect(x1, slY, x2 - x1, entryY - slY);
+                                        ctx.fillStyle = greenColor;
+                                        ctx.fillRect(x1, entryY, x2 - x1, tpY - entryY);
+                                    }
+
+                                    ctx.setLineDash([4, 4]);
+                                    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                                    ctx.lineWidth = 1;
+                                    ctx.beginPath();
+                                    ctx.moveTo(x1, entryY);
+                                    ctx.lineTo(x2, entryY);
+                                    ctx.stroke();
+                                    ctx.setLineDash([]);
+
+                                    ctx.strokeStyle = 'rgba(34,197,94,0.8)';
+                                    ctx.lineWidth = 1;
+                                    ctx.beginPath();
+                                    ctx.moveTo(x1, self._isLong ? tpY : tpY);
+                                    ctx.lineTo(x2, self._isLong ? tpY : tpY);
+                                    ctx.stroke();
+
+                                    ctx.strokeStyle = 'rgba(239,68,68,0.8)';
+                                    ctx.lineWidth = 1;
+                                    ctx.beginPath();
+                                    ctx.moveTo(x1, slY);
+                                    ctx.lineTo(x2, slY);
+                                    ctx.stroke();
+
+                                    ctx.font = '10px monospace';
+                                    const labelX = Math.min(x2 + 4, timeScale.width() - 60);
+
+                                    ctx.fillStyle = '#22c55e';
+                                    ctx.fillText(self._tp.toFixed(5), labelX, tpY + 4);
+
+                                    ctx.fillStyle = '#ffffff';
+                                    ctx.fillText(self._entry.toFixed(5), labelX, entryY + 4);
+
+                                    ctx.fillStyle = '#ef4444';
+                                    ctx.fillText(self._sl.toFixed(5), labelX, slY + 4);
+                                });
+                            }
+                        };
+                    }
+                }];
+            }
+        }
+
+        function computePrices(signal) {
+            const entry = signal.entry_price;
+            const isLong = signal.signal === 'LONG';
+            let tp = signal.tp_price;
+            let sl = signal.sl_price;
+            if (tp === undefined || sl === undefined) {
+                tp = isLong ? entry + signal.tp_pips / 10000 : entry - signal.tp_pips / 10000;
+                sl = isLong ? entry - signal.sl_pips / 10000 : entry + signal.sl_pips / 10000;
+            }
+            return { entry, tp, sl, isLong };
+        }
+
+        function showSignalOverlay(signal) {
+            if (!chart || !candleSeries) return;
+            const { entry, tp, sl, isLong } = computePrices(signal);
+            const startTime = Math.floor(new Date(signal.timestamp).getTime() / 1000);
+            const endTime = signal.result !== 'pending' && signal.closed_at
+                ? Math.floor(new Date(signal.closed_at).getTime() / 1000)
+                : null;
+
+            if (overlayPrimitives.has(signal.id)) {
+                overlayPrimitives.get(signal.id).updateTimes(startTime, endTime);
+                return;
+            }
+
+            const overlay = new SignalOverlay(entry, tp, sl, isLong, startTime, endTime);
+            overlay._series = candleSeries;
+            candleSeries.attachPrimitive(overlay);
+            overlayPrimitives.set(signal.id, overlay);
+        }
+
+        function syncPendingOverlays(signals) {
+            if (!chart || !candleSeries) return;
+            signals.forEach(s => {
+                if (s.result === 'pending' && !overlayPrimitives.has(s.id)) {
+                    showSignalOverlay(s);
+                }
+            });
+        }
+
+        function updateTableClickHandler() {
+            const tbody = document.getElementById('signalsBody');
+            tbody.onclick = function(e) {
+                const row = e.target.closest('tr');
+                if (!row) return;
+                const id = parseInt(row.cells[0].textContent);
+                const signal = signalsMap.get(id);
+                if (!signal) return;
+
+                document.querySelectorAll('.signals-table tr.selected').forEach(r => r.classList.remove('selected'));
+                row.classList.add('selected');
+                showSignalOverlay(signal);
+                addLog(`Showing overlay: #${signal.id} ${signal.signal}`);
+            };
+        }
 
         function updateClock() {
             const now = new Date();
@@ -366,7 +542,7 @@
                 const rt = s.result === 'pending' ? 'PENDING' : s.result;
                 const pnl = s.pnl_pips > 0 ? '+' + s.pnl_pips.toFixed(1) : s.pnl_pips < 0 ? s.pnl_pips.toFixed(1) : '--';
                 const pc = s.pnl_pips > 0 ? 'pnl-pos' : s.pnl_pips < 0 ? 'pnl-neg' : '';
-                return `<tr><td>${s.id}</td><td>${t}</td><td><span class="badge ${s.signal==='LONG'?'long':'short'}">${s.signal}</span></td><td>${s.entry_price.toFixed(5)}</td><td style="color:var(--green)">${s.tp_pips}</td><td style="color:var(--red)">${s.sl_pips}</td><td>1:${s.tp_sl_ratio}</td><td>${s.confidence}</td><td><span class="badge ${rc}">${rt}</span></td><td class="${pc}">${pnl}</td></tr>`;
+                return `<tr data-id="${s.id}"><td>${s.id}</td><td>${t}</td><td><span class="badge ${s.signal==='LONG'?'long':'short'}">${s.signal}</span></td><td>${s.entry_price.toFixed(5)}</td><td style="color:var(--green)">${s.tp_pips}</td><td style="color:var(--red)">${s.sl_pips}</td><td>1:${s.tp_sl_ratio}</td><td>${s.confidence}</td><td><span class="badge ${rc}">${rt}</span></td><td class="${pc}">${pnl}</td></tr>`;
             }).join('');
         }
 
@@ -383,6 +559,17 @@
                     if (data.signals.length > 0) updateLatest(data.signals[data.signals.length - 1]);
                     if (data.signals.length > lastSignalCount && lastSignalCount > 0) { addLog('New signal #' + data.signals.length); await addSignalMarkers(); }
                     lastSignalCount = data.signals.length;
+
+                    data.signals.forEach(s => signalsMap.set(s.id, s));
+                    syncPendingOverlays(data.signals);
+
+                    for (const [id, prim] of overlayPrimitives) {
+                        const sig = signalsMap.get(id);
+                        if (sig && sig.result !== 'pending') {
+                            const endTime = sig.closed_at ? Math.floor(new Date(sig.closed_at).getTime() / 1000) : null;
+                            prim.updateTimes(Math.floor(new Date(sig.timestamp).getTime() / 1000), endTime);
+                        }
+                    }
                 } else {
                     document.getElementById('statusBadge').className = 'status-badge inactive';
                     document.getElementById('statusText').textContent = 'Error';
@@ -403,6 +590,7 @@
         fetchAll(); setInterval(fetchAll, 5000);
         setInterval(updateLiveCandle, 5000);
         setInterval(() => loadChart(currentTF), 60000);
+        updateTableClickHandler();
         addLog('Dashboard started');
     </script>
 </body>
