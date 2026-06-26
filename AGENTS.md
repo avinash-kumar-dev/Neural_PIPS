@@ -39,6 +39,12 @@ A **EUR/USD scalping signal GENERATOR** (NOT an execution bot). It outputs:
 - Never commit `.env` files or credentials
 - Never log secrets or API keys
 
+### Rule 6: Commit After Every Change
+- After every meaningful change (new file, edit, fix), make a git commit
+- Use clear, descriptive commit messages
+- Run `git add -A && git commit -m "description"` immediately after changes
+- Never leave uncommitted work sitting around
+
 ---
 
 ## Project Structure
