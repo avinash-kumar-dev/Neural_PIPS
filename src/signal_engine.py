@@ -28,8 +28,6 @@ class SignalEngine:
             return self._no_trade('outside_session')
 
         ml_pred, ml_confidence = self._predict(features_row, model, meta_model)
-        if ml_pred == 0:
-            return self._no_trade('model_rejected')
 
         h4_regime = features_row.get('h4_regime', 0)
         if h4_regime > 0 and ml_pred == 0:
