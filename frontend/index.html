@@ -133,7 +133,11 @@
                     <button class="tf-btn" data-tf="H4">H4</button>
                 </div>
             </div>
-            <div id="chartContainer"></div>
+            <div id="chartWrap" style="position:relative">
+                <div id="chartContainer"></div>
+                <div id="priceLabels" style="position:absolute;top:0;right:0;pointer-events:none;z-index:10"></div>
+                <div id="timerLabel" style="position:absolute;top:0;right:0;pointer-events:none;z-index:10"></div>
+            </div>
         </div>
 
         <div class="content-grid">
@@ -168,6 +172,11 @@
         .signals-table tr { cursor: pointer; }
         .signals-table tr:hover td { background: var(--bg4); }
         .signals-table tr.selected td { background: rgba(59,130,246,0.15); }
+        .price-label { position: absolute; right: 0; font-size: 10px; font-family: 'SF Mono','Fira Code','Consolas',monospace; padding: 1px 5px; border-radius: 2px; white-space: nowrap; transform: translateY(-50%); font-weight: 600; }
+        .price-label.entry { background: rgba(255,255,255,0.15); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.3); }
+        .price-label.tp { background: rgba(34,197,94,0.2); color: #22c55e; border: 1px solid rgba(34,197,94,0.4); }
+        .price-label.sl { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); }
+        .price-label.timer { background: rgba(59,130,246,0.2); color: #3b82f6; border: 1px solid rgba(59,130,246,0.4); }
     </style>
     <script>
         let chart, candleSeries, volumeSeries, markerSeries;
@@ -178,8 +187,8 @@
 
         const overlayPrimitives = new Map();
         const signalsMap = new Map();
-        const signalPriceLines = new Map();
-        let timerPriceLine = null;
+        const htmlPriceLabels = new Map();
+        let timerLabelEl = null;
 
         class SignalOverlay {
             constructor(entryPrice, tpPrice, slPrice, isLong, startTime, endTime) {
@@ -315,6 +324,7 @@
 
             if (overlayPrimitives.has(signal.id)) {
                 overlayPrimitives.get(signal.id).updateTimes(startTime, endTime);
+                updateHtmlLabels();
                 return;
             }
 
@@ -323,35 +333,62 @@
             candleSeries.attachPrimitive(overlay);
             overlayPrimitives.set(signal.id, overlay);
 
-            if (!signalPriceLines.has(signal.id)) {
-                const entryLine = candleSeries.createPriceLine({
-                    price: entry, color: '#ffffff', lineWidth: 1,
-                    lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true, title: `E#${signal.id}`,
-                });
-                const tpLine = candleSeries.createPriceLine({
-                    price: tp, color: '#22c55e', lineWidth: 1,
-                    lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true, title: `TP#${signal.id}`,
-                });
-                const slLine = candleSeries.createPriceLine({
-                    price: sl, color: '#ef4444', lineWidth: 1,
-                    lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true, title: `SL#${signal.id}`,
-                });
-                signalPriceLines.set(signal.id, { entryLine, tpLine, slLine });
+            if (!htmlPriceLabels.has(signal.id)) {
+                const container = document.getElementById('priceLabels');
+                const entryEl = document.createElement('div');
+                entryEl.className = 'price-label entry';
+                entryEl.textContent = entry.toFixed(5) + ' E#' + signal.id;
+                const tpEl = document.createElement('div');
+                tpEl.className = 'price-label tp';
+                tpEl.textContent = tp.toFixed(5) + ' TP';
+                const slEl = document.createElement('div');
+                slEl.className = 'price-label sl';
+                slEl.textContent = sl.toFixed(5) + ' SL';
+                container.appendChild(entryEl);
+                container.appendChild(tpEl);
+                container.appendChild(slEl);
+                htmlPriceLabels.set(signal.id, { entryEl, tpEl, slEl, entry, tp, sl });
+                updateHtmlLabels();
             }
         }
 
-        function removeSignalPriceLines(signalId) {
-            const lines = signalPriceLines.get(signalId);
-            if (!lines) return;
-            try {
-                candleSeries.removePriceLine(lines.entryLine);
-                candleSeries.removePriceLine(lines.tpLine);
-                candleSeries.removePriceLine(lines.slLine);
-            } catch(e) {}
-            signalPriceLines.delete(signalId);
+        function removeHtmlLabels(signalId) {
+            const labels = htmlPriceLabels.get(signalId);
+            if (!labels) return;
+            labels.entryEl.remove();
+            labels.tpEl.remove();
+            labels.slEl.remove();
+            htmlPriceLabels.delete(signalId);
+        }
+
+        function updateHtmlLabels() {
+            if (!chart || !candleSeries) return;
+            const wrap = document.getElementById('chartWrap');
+            const wrapRect = wrap.getBoundingClientRect();
+            const chartDiv = document.getElementById('chartContainer');
+            const chartRect = chartDiv.getBoundingClientRect();
+
+            htmlPriceLabels.forEach((labels, id) => {
+                const entryY = candleSeries.priceToCoordinate(labels.entry);
+                const tpY = candleSeries.priceToCoordinate(labels.tp);
+                const slY = candleSeries.priceToCoordinate(labels.sl);
+                if (entryY === null && tpY === null && slY === null) return;
+
+                if (entryY !== null) {
+                    labels.entryEl.style.display = '';
+                    labels.entryEl.style.top = (entryY + chartRect.top - wrapRect.top) + 'px';
+                } else { labels.entryEl.style.display = 'none'; }
+
+                if (tpY !== null) {
+                    labels.tpEl.style.display = '';
+                    labels.tpEl.style.top = (tpY + chartRect.top - wrapRect.top) + 'px';
+                } else { labels.tpEl.style.display = 'none'; }
+
+                if (slY !== null) {
+                    labels.slEl.style.display = '';
+                    labels.slEl.style.top = (slY + chartRect.top - wrapRect.top) + 'px';
+                } else { labels.slEl.style.display = 'none'; }
+            });
         }
 
         function getCandleTimerSeconds() {
@@ -369,22 +406,30 @@
             const remaining = getCandleTimerSeconds();
             const m = Math.floor(remaining / 60);
             const s = remaining % 60;
-            const label = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            const text = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 
             try {
                 const lastBar = candleSeries.data().slice(-1)[0];
                 if (!lastBar) return;
                 const price = lastBar.close;
+                const y = candleSeries.priceToCoordinate(price);
+                if (y === null) return;
 
-                if (timerPriceLine) {
-                    timerPriceLine.applyOptions({ price: price, title: label });
-                } else {
-                    timerPriceLine = candleSeries.createPriceLine({
-                        price: price, color: '#3b82f6', lineWidth: 1,
-                        lineStyle: LightweightCharts.LineStyle.Solid,
-                        axisLabelVisible: true, title: label,
-                    });
+                const wrap = document.getElementById('chartWrap');
+                const wrapRect = wrap.getBoundingClientRect();
+                const chartDiv = document.getElementById('chartContainer');
+                const chartRect = chartDiv.getBoundingClientRect();
+
+                let el = timerLabelEl;
+                if (!el) {
+                    el = document.createElement('div');
+                    el.className = 'price-label timer';
+                    document.getElementById('timerLabel').appendChild(el);
+                    timerLabelEl = el;
                 }
+                el.textContent = text;
+                el.style.display = '';
+                el.style.top = (y + chartRect.top - wrapRect.top) + 'px';
             } catch(e) {}
         }
 
@@ -444,6 +489,7 @@
                 upColor: '#22c55e', downColor: '#ef4444',
                 borderUpColor: '#22c55e', borderDownColor: '#ef4444',
                 wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+                priceFormat: { type: 'price', precision: 5, minMove: 0.00001 },
             });
 
             volumeSeries = chart.addHistogramSeries({
@@ -461,10 +507,7 @@
 
         async function loadChart(tf) {
             currentTF = tf;
-            if (timerPriceLine) {
-                try { candleSeries.removePriceLine(timerPriceLine); } catch(e) {}
-                timerPriceLine = null;
-            }
+            if (timerLabelEl) timerLabelEl.style.display = 'none';
             document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tf));
             try {
                 const res = await fetch(`/api/ohlcv?tf=${tf}&count=300`);
@@ -638,7 +681,7 @@
                         if (sig && sig.result !== 'pending') {
                             const endTime = sig.closed_at ? Math.floor(new Date(sig.closed_at).getTime() / 1000) : null;
                             prim.updateTimes(Math.floor(new Date(sig.timestamp).getTime() / 1000), endTime);
-                            removeSignalPriceLines(id);
+                            removeHtmlLabels(id);
                         }
                     }
                 } else {
@@ -657,10 +700,13 @@
 
         updateClock(); setInterval(updateClock, 1000);
         initChart(); initEquityChart();
+        chart.timeScale().subscribeVisibleLogicalRangeChange(() => { updateHtmlLabels(); updateCandleTimer(); });
+        chart.timeScale().subscribeVisibleTimeRangeChange(() => { updateHtmlLabels(); updateCandleTimer(); });
         loadChart('M5');
         fetchAll(); setInterval(fetchAll, 5000);
         setInterval(updateLiveCandle, 5000);
         setInterval(updateCandleTimer, 1000);
+        setInterval(updateHtmlLabels, 2000);
         setInterval(() => loadChart(currentTF), 60000);
         updateTableClickHandler();
         addLog('Dashboard started');
