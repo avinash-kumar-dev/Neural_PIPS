@@ -17,7 +17,7 @@ from src.confidence_scorer import ConfidenceScorer
 from src.signal_engine import SignalEngine
 
 SIGNALS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'eurusd', 'live_signals.json')
-MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'v5_phase1')
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'v5_phase3')
 
 running = True
 
@@ -49,7 +49,6 @@ def load_models():
     import joblib
     xgb = joblib.load(os.path.join(MODELS_DIR, 'xgboost.joblib'))
     lgbm = joblib.load(os.path.join(MODELS_DIR, 'lightgbm.joblib'))
-    meta = joblib.load(os.path.join(MODELS_DIR, 'meta.joblib'))
     pipeline = FeaturePipeline.load(os.path.join(MODELS_DIR, 'feature_pipeline.joblib'))
 
     catboost_path = os.path.join(MODELS_DIR, 'catboost.joblib')
@@ -58,7 +57,13 @@ def load_models():
         catboost = joblib.load(catboost_path)
         models.append(catboost)
 
-    return models, meta, pipeline
+    weights_path = os.path.join(MODELS_DIR, 'ensemble_weights.joblib')
+    if os.path.exists(weights_path):
+        weights = joblib.load(weights_path)
+    else:
+        weights = np.array([1.0 / len(models)] * len(models))
+
+    return models, weights, pipeline
 
 
 def check_signal_outcome(signal_entry, m5_df):
@@ -103,7 +108,7 @@ def check_signal_outcome(signal_entry, m5_df):
     return signal_entry
 
 
-def run_check(fetcher, engineer, pipeline, models, meta_model, scorer, engine):
+def run_check(fetcher, engineer, pipeline, models, weights, scorer, engine):
     now_utc = datetime.now(timezone.utc)
     hour = now_utc.hour
 
@@ -131,7 +136,7 @@ def run_check(fetcher, engineer, pipeline, models, meta_model, scorer, engine):
     feat_series = pd.Series(feat_row)
     raw_series = pd.Series(raw_row)
 
-    engine_result = engine.generate_signal(feat_series, raw_series, models, meta_model)
+    engine_result = engine.generate_signal(feat_series, raw_series, models, weights)
 
     if engine_result['signal'] == 'NO-TRADE':
         return None, engine_result['reason']
@@ -169,16 +174,16 @@ def main():
     print("=" * 60)
     print("  EUR/USD Live Paper Trading")
     print("  Session: 13:00-16:00 UTC (18:00-21:00 PKT)")
-    print("  Threshold: 78 | TP:SL = 3:1 | V5 Phase 1 (XGB+LGBM+CatBoost+LR)")
+    print("  Threshold: 78 | TP:SL = 3:1 | V5 Phase 3 (XGB+LGBM+CatBoost weighted avg)")
     print("=" * 60)
 
     print("\nLoading models...")
-    models, meta_model, pipeline = load_models()
+    models, weights, pipeline = load_models()
     print(f"  XGBoost: {type(models[0]).__name__}")
     print(f"  LightGBM: {type(models[1]).__name__}")
     if len(models) > 2:
         print(f"  CatBoost: {type(models[2]).__name__}")
-    print(f"  Meta: {type(meta_model).__name__}")
+    print(f"  Ensemble weights: [{', '.join(f'{w:.3f}' for w in weights)}]")
     print(f"  Pipeline: {len(pipeline.feature_names_out_)} features")
 
     engineer = FeatureEngineer()
@@ -231,7 +236,7 @@ def main():
             break
 
         check_count += 1
-        signal_obj, reason = run_check(fetcher, engineer, pipeline, models, meta_model, scorer, engine)
+        signal_obj, reason = run_check(fetcher, engineer, pipeline, models, weights, scorer, engine)
 
         ts = now_utc.strftime('%H:%M:%S')
         if signal_obj:

@@ -175,6 +175,52 @@
         "High-confidence signals (T>=78) are all LONG with poor accuracy",
         "Model never outputs SHORT with confidence > 0.5 — no high-confidence SHORT signals"
       ],
+      "status": "superseded_by_v5_phase3"
+    },
+    "v5_phase3": {
+      "description": "Phase 3: Optimized weighted average meta (Nelder-Mead), NO class weights, CatBoost, embargo=48, RobustScaler. XGBoost dominates (weight=1.0).",
+      "train_method": "walk_forward_12_windows_phase3_weighted_average",
+      "train_period": "2025-02-21 to 2026-05-29",
+      "n_features": 61,
+      "has_h4_regime": true,
+      "class_weights": false,
+      "normalization_leak_fixed": true,
+      "catboost_added": true,
+      "meta_learner": "weighted_average_nelder_mead",
+      "ensemble_weights": [1.0, 0.0, 0.0],
+      "scaler": "RobustScaler",
+      "embargo_bars": 48,
+      "files": {
+        "xgboost": "models/v5_phase3/xgboost.joblib",
+        "lightgbm": "models/v5_phase3/lightgbm.joblib",
+        "catboost": "models/v5_phase3/catboost.joblib",
+        "ensemble_weights": "models/v5_phase3/ensemble_weights.joblib",
+        "feature_pipeline": "models/v5_phase3/feature_pipeline.joblib"
+      },
+      "metrics": {
+        "walk_forward_accuracy_mean": 0.855,
+        "walk_forward_accuracy_std": 0.015,
+        "n_windows": 9,
+        "total_train_bars": 65309,
+        "train_time_seconds": 132.2
+      },
+      "holdout_june_metrics": {
+        "base_accuracy": 87.2,
+        "meta_proba_mean": 0.132,
+        "session_short_predictions": 3879,
+        "session_long_predictions": 93,
+        "long_accuracy_T75": 80.0,
+        "long_signals_T75": 5,
+        "long_accuracy_T78": 80.0,
+        "long_signals_T78": 5,
+        "long_accuracy_T80": 100.0,
+        "long_signals_T80": 4,
+        "long_accuracy_T82": 100.0,
+        "long_signals_T82": 3,
+        "long_accuracy_T85": 100.0,
+        "long_signals_T85": 2,
+        "short_signals_any_threshold": 0
+      },
       "status": "current"
     }
   }

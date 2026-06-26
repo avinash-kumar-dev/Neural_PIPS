@@ -18,7 +18,7 @@ class SignalEngine:
         self.min_sl_pips = cfg.get('min_sl_pips', 3)
         self.max_sl_pips = cfg.get('max_sl_pips', 15)
 
-    def generate_signal(self, features_row, raw_features_row, model, meta_model):
+    def generate_signal(self, features_row, raw_features_row, model, meta_or_weights):
         if 'time' not in features_row:
             return self._no_trade('no_time')
 
@@ -27,7 +27,7 @@ class SignalEngine:
         if not (self.session_start <= hour < self.session_end):
             return self._no_trade('outside_session')
 
-        ml_pred, ml_confidence = self._predict(features_row, model, meta_model)
+        ml_pred, ml_confidence = self._predict(features_row, model, meta_or_weights)
 
         h4_regime = features_row.get('h4_regime', 0)
         if h4_regime > 0 and ml_pred == 0:
@@ -64,11 +64,16 @@ class SignalEngine:
             'reason': 'signal_generated',
         }
 
-    def _predict(self, features_row, model, meta_model):
+    def _predict(self, features_row, model, meta_or_weights):
         feat_cols = [c for c in features_row.index if c != 'time']
         X = features_row[feat_cols].values.reshape(1, -1).astype(float)
-        base_preds = np.column_stack([m.predict_proba(X)[:, 1] for m in model])
-        meta_pred = np.clip(meta_model.predict(base_preds), 0, 1)
+        base_proba = np.column_stack([m.predict_proba(X)[:, 1] for m in model])
+
+        if isinstance(meta_or_weights, np.ndarray):
+            meta_pred = base_proba @ meta_or_weights
+        else:
+            meta_pred = np.clip(meta_or_weights.predict(base_proba), 0, 1)
+
         return int(meta_pred[0] > 0.5), float(meta_pred[0])
 
     def _no_trade(self, reason):
