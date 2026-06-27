@@ -221,7 +221,28 @@
         "long_signals_T85": 2,
         "short_signals_any_threshold": 0
       },
-      "status": "current"
+      "bugs_fixed_2026_06_27": {
+        "h4_gate": "Was reading h4_regime from scaled features (name 'f43' not 'h4_regime'), gate always returned 0. Fixed to read from raw_features_row.",
+        "atr_default": "atr_pips was never computed, defaulted to 10. Fixed: computes real ATR(14)*10000, fallback to atr_14*10000.",
+        "live_feature_engineering": "raw_dict now uses actual feature names (not generic f0-f60) and includes atr_pips."
+      },
+      "june_2026_full_backtest": {
+        "period": "2026-06-01 to 2026-06-26",
+        "total_signals": 25,
+        "wins": 9,
+        "losses": 13,
+        "open": 3,
+        "win_rate_closed": 0.409,
+        "total_pnl_pips": 64.3,
+        "avg_win_pips": 15.7,
+        "avg_loss_pips": -6.0,
+        "signals_per_day": 2.5,
+        "long_signals": 0,
+        "short_signals": 25,
+        "best_day": {"date": "2026-06-11", "pnl": 67.2, "signals": 5, "wins": 4},
+        "worst_day": {"date": "2026-06-08", "pnl": -24.8, "signals": 3, "wins": 0}
+      },
+      "status": "current_production"
     }
   }
 }
