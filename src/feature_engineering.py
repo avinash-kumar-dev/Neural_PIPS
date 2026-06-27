@@ -505,6 +505,170 @@ class TimeFeatures:
         return features
 
 
+class QualityFeatures:
+    """Features that predict trade outcome quality (will TP hit before SL?)."""
+
+    def compute(self, df):
+        features = pd.DataFrame(index=df.index)
+        close = df['close'].values
+        high = df['high'].values
+        low = df['low'].values
+
+        atr = self._compute_atr(df, 14)
+        atr_pips = atr * 10000
+
+        atr_series = pd.Series(atr, index=df.index)
+        features['atr_percentile_rank'] = atr_series.rolling(200, min_periods=50).rank(pct=True)
+
+        typical = (high + low + close) / 3
+        tp1 = pd.Series(typical, index=df.index).rolling(20).mean()
+        tp2 = tp1.rolling(20).mean()
+        std20 = pd.Series(typical, index=df.index).rolling(20).std()
+        bb_upper = tp1 + 2 * std20
+        bb_lower = tp1 - 2 * std20
+        bb_width = (bb_upper - bb_lower) / tp1
+        features['bb_width_percentile'] = bb_width.rolling(100, min_periods=30).rank(pct=True)
+
+        adx = self._compute_adx(df, 14)
+        features['adx_strength'] = pd.Series(adx, index=df.index).clip(0, 100) / 100.0
+
+        adx_series = pd.Series(adx, index=df.index)
+        plus_di = self._compute_plus_di(df, 14)
+        minus_di = self._compute_minus_di(df, 14)
+        features['confluence_score_raw'] = (
+            (adx_series / 100.0) *
+            np.abs(pd.Series(plus_di, index=df.index) - pd.Series(minus_di, index=df.index)) / 100.0
+        )
+
+        close_s = pd.Series(close, index=df.index)
+        momentum_5 = (close_s - close_s.shift(5)).abs()
+        features['price_momentum_5bar'] = momentum_5 / atr_series.clip(lower=1e-10)
+
+        atr_10_ago = atr_series.shift(10)
+        features['recent_vol_change'] = ((atr_series - atr_10_ago).abs() / atr_series.clip(lower=1e-10)).clip(0, 5)
+
+        high_20 = pd.Series(high, index=df.index).rolling(20).max()
+        low_20 = pd.Series(low, index=df.index).rolling(20).min()
+        features['distance_to_recent_high'] = ((high_20 - close_s) / atr_series.clip(lower=1e-10)).clip(-5, 5)
+        features['distance_to_recent_low'] = ((close_s - low_20) / atr_series.clip(lower=1e-10)).clip(-5, 5)
+
+        return features
+
+    def _compute_atr(self, df, period):
+        high = df['high'].values
+        low = df['low'].values
+        close = df['close'].values
+        tr = np.maximum(high[1:] - low[1:],
+                        np.maximum(np.abs(high[1:] - close[:-1]),
+                                   np.abs(low[1:] - close[:-1])))
+        atr = np.full(len(df), np.nan)
+        if len(tr) >= period:
+            atr[period] = np.mean(tr[:period])
+            alpha = 1.0 / period
+            for i in range(period + 1, len(df)):
+                atr[i] = atr[i - 1] * (1 - alpha) + tr[i - 1] * alpha
+        return atr
+
+    def _compute_adx(self, df, period):
+        high = df['high'].values
+        low = df['low'].values
+        close = df['close'].values
+        n = len(df)
+        tr = np.zeros(n)
+        plus_dm = np.zeros(n)
+        minus_dm = np.zeros(n)
+        for i in range(1, n):
+            tr[i] = max(high[i] - low[i], abs(high[i] - close[i-1]), abs(low[i] - close[i-1]))
+            up = high[i] - high[i-1]
+            down = low[i-1] - low[i]
+            plus_dm[i] = up if (up > down and up > 0) else 0
+            minus_dm[i] = down if (down > up and down > 0) else 0
+        atr_s = np.full(n, np.nan)
+        pdm = np.full(n, np.nan)
+        ndm = np.full(n, np.nan)
+        if n > period:
+            atr_s[period] = np.mean(tr[1:period+1])
+            pdm[period] = np.mean(plus_dm[1:period+1])
+            ndm[period] = np.mean(minus_dm[1:period+1])
+            alpha = 1.0 / period
+            for i in range(period+1, n):
+                atr_s[i] = atr_s[i-1] * (1-alpha) + tr[i] * alpha
+                pdm[i] = pdm[i-1] * (1-alpha) + plus_dm[i] * alpha
+                ndm[i] = ndm[i-1] * (1-alpha) + minus_dm[i] * alpha
+        adx = np.full(n, np.nan)
+        dx = np.full(n, np.nan)
+        for i in range(period, n):
+            if atr_s[i] > 0:
+                pdi = 100 * pdm[i] / atr_s[i]
+                ndi = 100 * ndm[i] / atr_s[i]
+                di_sum = pdi + ndi
+                dx[i] = 100 * abs(pdi - ndi) / di_sum if di_sum > 0 else 0
+        adx_start = 2 * period
+        if adx_start < n:
+            dx_slice = dx[period:adx_start]
+            valid = dx_slice[~np.isnan(dx_slice)]
+            if len(valid) > 0:
+                adx[adx_start] = np.mean(valid)
+                for i in range(adx_start + 1, n):
+                    if not np.isnan(dx[i]) and not np.isnan(adx[i-1]):
+                        adx[i] = (adx[i-1] * (period-1) + dx[i]) / period
+        return adx
+
+    def _compute_plus_di(self, df, period):
+        high = df['high'].values
+        low = df['low'].values
+        close = df['close'].values
+        n = len(df)
+        tr = np.zeros(n)
+        plus_dm = np.zeros(n)
+        for i in range(1, n):
+            tr[i] = max(high[i] - low[i], abs(high[i] - close[i-1]), abs(low[i] - close[i-1]))
+            up = high[i] - high[i-1]
+            down = low[i-1] - low[i]
+            plus_dm[i] = up if (up > down and up > 0) else 0
+        atr_s = np.full(n, np.nan)
+        pdm = np.full(n, np.nan)
+        if n > period:
+            atr_s[period] = np.mean(tr[1:period+1])
+            pdm[period] = np.mean(plus_dm[1:period+1])
+            alpha = 1.0 / period
+            for i in range(period+1, n):
+                atr_s[i] = atr_s[i-1] * (1-alpha) + tr[i] * alpha
+                pdm[i] = pdm[i-1] * (1-alpha) + plus_dm[i] * alpha
+        pdi = np.full(n, np.nan)
+        for i in range(period, n):
+            if atr_s[i] and not np.isnan(atr_s[i]) and atr_s[i] > 0:
+                pdi[i] = 100 * pdm[i] / atr_s[i]
+        return pdi
+
+    def _compute_minus_di(self, df, period):
+        high = df['high'].values
+        low = df['low'].values
+        close = df['close'].values
+        n = len(df)
+        tr = np.zeros(n)
+        minus_dm = np.zeros(n)
+        for i in range(1, n):
+            tr[i] = max(high[i] - low[i], abs(high[i] - close[i-1]), abs(low[i] - close[i-1]))
+            up = high[i] - high[i-1]
+            down = low[i-1] - low[i]
+            minus_dm[i] = down if (down > up and down > 0) else 0
+        atr_s = np.full(n, np.nan)
+        ndm = np.full(n, np.nan)
+        if n > period:
+            atr_s[period] = np.mean(tr[1:period+1])
+            ndm[period] = np.mean(minus_dm[1:period+1])
+            alpha = 1.0 / period
+            for i in range(period+1, n):
+                atr_s[i] = atr_s[i-1] * (1-alpha) + tr[i] * alpha
+                ndm[i] = ndm[i-1] * (1-alpha) + minus_dm[i] * alpha
+        ndi = np.full(n, np.nan)
+        for i in range(period, n):
+            if atr_s[i] and not np.isnan(atr_s[i]) and atr_s[i] > 0:
+                ndi[i] = 100 * ndm[i] / atr_s[i]
+        return ndi
+
+
 class FeatureEngineer:
     FEATURE_VECTOR = [
         'return_1', 'return_2', 'return_3', 'return_5', 'return_10', 'return_20',
@@ -535,6 +699,9 @@ class FeatureEngineer:
         'minute_of_day', 'is_london_open', 'is_ny_afternoon',
         'is_any_session', 'london_progress', 'overlap_progress', 'ny_progress',
         'hour_of_day', 'is_weekend',
+        'atr_percentile_rank', 'bb_width_percentile', 'adx_strength',
+        'confluence_score_raw', 'price_momentum_5bar', 'recent_vol_change',
+        'distance_to_recent_high', 'distance_to_recent_low',
     ]
 
     def __init__(self):
@@ -546,6 +713,7 @@ class FeatureEngineer:
         self.regime = RegimeFeatures()
         self.volatility = VolatilityFeatures()
         self.time = TimeFeatures()
+        self.quality = QualityFeatures()
 
     def compute_all(self, m5_df, m15_df, h1_df, h4_df):
         price_feat = self.price.compute(m5_df)
@@ -556,8 +724,9 @@ class FeatureEngineer:
         regime_feat = self.regime.compute(m5_df)
         vol_feat = self.volatility.compute(m5_df)
         time_feat = self.time.compute(m5_df['time'])
+        quality_feat = self.quality.compute(m5_df)
 
-        all_features = pd.concat([price_feat, tech_feat, mtf_feat, session_feat, smc_feat, regime_feat, vol_feat, time_feat], axis=1)
+        all_features = pd.concat([price_feat, tech_feat, mtf_feat, session_feat, smc_feat, regime_feat, vol_feat, time_feat, quality_feat], axis=1)
         all_features = all_features.replace([np.inf, -np.inf], np.nan)
         return all_features
 

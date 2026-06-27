@@ -21,6 +21,11 @@ class SignalEngine:
         self.max_atr_ratio = cfg.get('max_atr_ratio', 2.5)
         self.min_atr_pips = cfg.get('min_atr_pips', 3.0)
         self.max_atr_pips = cfg.get('max_atr_pips', 20.0)
+        self.quality_threshold = cfg.get('quality_threshold', 0.55)
+        self.quality_model = cfg.get('quality_model', None)
+        self.quality_weights = cfg.get('quality_weights', None)
+        self.quality_pipeline = cfg.get('quality_pipeline', None)
+        self.direction_feature_names = cfg.get('direction_feature_names', None)
 
         sessions = cfg.get('sessions', None)
         if sessions:
@@ -82,6 +87,13 @@ class SignalEngine:
         if spread_pips > self.max_spread_pips:
             return self._no_trade(f'spread_high_{spread_pips:.1f}')
 
+        if self.quality_model is not None:
+            quality_score = self._predict_quality(features_row)
+            if quality_score < self.quality_threshold:
+                return self._no_trade(f'low_quality_{quality_score:.2f}')
+        else:
+            quality_score = 0.5
+
         from src.confidence_scorer import ConfidenceScorer
         scorer = ConfidenceScorer({'threshold': self.confidence_threshold})
         confidence, scores = scorer.score(features_row, raw_features_row)
@@ -98,6 +110,7 @@ class SignalEngine:
             'signal': signal_dir,
             'confidence': confidence,
             'ml_confidence': ml_confidence,
+            'quality_score': quality_score,
             'confluence': f'{agree_count}/{n_models}',
             'tp_pips': tp_pips,
             'sl_pips': sl_pips,
@@ -108,8 +121,36 @@ class SignalEngine:
             'reason': 'signal_generated',
         }
 
+    def _predict_quality(self, features_row):
+        if self.quality_model is None:
+            return 0.5
+
+        feat_cols = [c for c in features_row.index if c != 'time']
+        X = features_row[feat_cols].values.reshape(1, -1).astype(float)
+
+        if self.quality_pipeline is not None:
+            X = self.quality_pipeline.transform(X)
+
+        individual_preds = []
+        for m in self.quality_model:
+            proba = m.predict_proba(X)[:, 1]
+            individual_preds.append(float(proba[0]))
+
+        base_proba = np.column_stack(individual_preds)
+
+        if isinstance(self.quality_weights, np.ndarray):
+            quality_pred = base_proba @ self.quality_weights
+        else:
+            quality_pred = np.mean(base_proba, axis=1)
+
+        return float(quality_pred[0])
+
     def _predict(self, features_row, model, meta_or_weights):
         feat_cols = [c for c in features_row.index if c != 'time']
+
+        if self.direction_feature_names is not None:
+            feat_cols = [c for c in self.direction_feature_names if c in features_row.index]
+
         X = features_row[feat_cols].values.reshape(1, -1).astype(float)
 
         if self.feature_pipeline is not None:
@@ -134,6 +175,7 @@ class SignalEngine:
             'signal': 'NO-TRADE',
             'confidence': 0,
             'ml_confidence': 0,
+            'quality_score': 0,
             'confluence': '0/0',
             'tp_pips': 0,
             'sl_pips': 0,
