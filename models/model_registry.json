@@ -1,7 +1,7 @@
 {
   "versions": {
     "v1_original": {
-      "description": "Walk-forward (10 windows), last window's models saved. Data leakage — tested on training data.",
+      "description": "Walk-forward (10 windows), last window's models saved. Data leakage \u2014 tested on training data.",
       "train_method": "walk_forward_10_windows",
       "train_period": "2025-03-17 to 2026-05-29",
       "test_method": "same_data_as_train (INFLATED)",
@@ -27,7 +27,7 @@
         "combined_signals": 136,
         "base_accuracy": null
       },
-      "issue": "Data leakage — inflated LONG accuracy. Walk-forward mean was honest at 77%.",
+      "issue": "Data leakage \u2014 inflated LONG accuracy. Walk-forward mean was honest at 77%.",
       "status": "deprecated"
     },
     "v2_holdout": {
@@ -54,10 +54,10 @@
       },
       "regime_analysis": {
         "h4_bullish_in_long_train": 0.49,
-        "h4_bullish_in_long_test": 0.00,
+        "h4_bullish_in_long_test": 0.0,
         "h4_bearish_in_long_train": 0.23,
         "h4_bearish_in_long_test": 0.68,
-        "root_cause": "H4 regime shift — model never saw LONG + H4-bearish together in training"
+        "root_cause": "H4 regime shift \u2014 model never saw LONG + H4-bearish together in training"
       },
       "status": "diagnostic_only"
     },
@@ -108,7 +108,10 @@
       "train_period": "2025-02-21 to 2026-05-29",
       "n_features": 61,
       "has_h4_regime": true,
-      "class_weights": {"long": 3.28, "short": 0.59},
+      "class_weights": {
+        "long": 3.28,
+        "short": 0.59
+      },
       "files": {
         "xgboost": "models/v4_retrained/xgboost.joblib",
         "lightgbm": "models/v4_retrained/lightgbm.joblib",
@@ -173,7 +176,7 @@
       "known_issues": [
         "Class weights made meta-learner too SHORT-biased (meta_proba mean=0.066)",
         "High-confidence signals (T>=78) are all LONG with poor accuracy",
-        "Model never outputs SHORT with confidence > 0.5 — no high-confidence SHORT signals"
+        "Model never outputs SHORT with confidence > 0.5 \u2014 no high-confidence SHORT signals"
       ],
       "status": "superseded_by_v5_phase3"
     },
@@ -187,7 +190,11 @@
       "normalization_leak_fixed": true,
       "catboost_added": true,
       "meta_learner": "weighted_average_nelder_mead",
-      "ensemble_weights": [1.0, 0.0, 0.0],
+      "ensemble_weights": [
+        1.0,
+        0.0,
+        0.0
+      ],
       "scaler": "RobustScaler",
       "embargo_bars": 48,
       "files": {
@@ -239,10 +246,72 @@
         "signals_per_day": 2.5,
         "long_signals": 0,
         "short_signals": 25,
-        "best_day": {"date": "2026-06-11", "pnl": 67.2, "signals": 5, "wins": 4},
-        "worst_day": {"date": "2026-06-08", "pnl": -24.8, "signals": 3, "wins": 0}
+        "best_day": {
+          "date": "2026-06-11",
+          "pnl": 67.2,
+          "signals": 5,
+          "wins": 4
+        },
+        "worst_day": {
+          "date": "2026-06-08",
+          "pnl": -24.8,
+          "signals": 3,
+          "wins": 0
+        }
       },
       "status": "current_production"
+    },
+    "v6": {
+      "description": "V6: Phase 2 features (81 total: 61 original + 20 SMC/Regime/Volatility), weighted average meta (Nelder-Mead), CatBoost, embargo=48, RobustScaler. XGBoost dominates (weight=1.0).",
+      "train_method": "walk_forward_12_windows_v6_weighted_average",
+      "train_period": "2025-02-21 to 2026-05-29",
+      "n_features": 81,
+      "new_features_count": 20,
+      "has_h4_regime": true,
+      "class_weights": false,
+      "normalization_leak_fixed": true,
+      "catboost_added": true,
+      "meta_learner": "weighted_average_nelder_mead",
+      "ensemble_weights": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "scaler": "RobustScaler",
+      "embargo_bars": 48,
+      "n_windows": 9,
+      "walk_forward_accuracy_mean": 0.8576,
+      "walk_forward_accuracy_std": 0.0137,
+      "total_train_bars": 65309,
+      "train_time_seconds": 193.8,
+      "holdout_june_2026": {
+        "long_at_t78": {
+          "signals": 3,
+          "accuracy": 100.0
+        },
+        "short_at_t78": {
+          "signals": 428,
+          "accuracy": 85.0
+        },
+        "backtest_june": {
+          "total_signals": 30,
+          "wins": 10,
+          "losses": 16,
+          "open": 4,
+          "win_rate": 38.5,
+          "total_pnl": 67.1,
+          "avg_win": 16.2,
+          "avg_loss": -5.9
+        }
+      },
+      "files": {
+        "xgboost": "models/v6/xgboost.joblib",
+        "lightgbm": "models/v6/lightgbm.joblib",
+        "catboost": "models/v6/catboost.joblib",
+        "ensemble_weights": "models/v6/ensemble_weights.joblib",
+        "feature_pipeline": "models/v6/feature_pipeline.joblib"
+      }
     }
-  }
+  },
+  "current_production": "v6"
 }

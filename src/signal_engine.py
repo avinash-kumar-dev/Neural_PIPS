@@ -15,6 +15,7 @@ class SignalEngine:
         self.confidence_threshold = cfg.get('confidence_threshold', 78)
         self.min_tp_pips = cfg.get('min_tp_pips', 9)
         self.min_sl_pips = cfg.get('min_sl_pips', 3)
+        self.feature_pipeline = cfg.get('feature_pipeline', None)
 
     def generate_signal(self, features_row, raw_features_row, model, meta_or_weights):
         if 'time' not in features_row:
@@ -72,6 +73,10 @@ class SignalEngine:
     def _predict(self, features_row, model, meta_or_weights):
         feat_cols = [c for c in features_row.index if c != 'time']
         X = features_row[feat_cols].values.reshape(1, -1).astype(float)
+
+        if self.feature_pipeline is not None:
+            X = self.feature_pipeline.transform(X)
+
         base_proba = np.column_stack([m.predict_proba(X)[:, 1] for m in model])
 
         if isinstance(meta_or_weights, np.ndarray):

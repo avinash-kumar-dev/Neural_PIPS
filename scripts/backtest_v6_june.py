@@ -3,7 +3,6 @@ import numpy as np
 import joblib
 import os
 import sys
-from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -11,7 +10,6 @@ from src.feature_engineering import FeatureEngineer
 from src.labels import TripleBarrierLabeler
 from src.signal_engine import SignalEngine
 from src.confidence_scorer import ConfidenceScorer
-from src.rule_filters import RuleFilters
 
 MODELS_DIR = 'models/v6'
 
@@ -24,10 +22,10 @@ def load_models():
     return [xgb, lgbm, cb], weights
 
 
-def backtest_today():
+def backtest_june():
     print("=" * 70)
-    print("  BACKTEST: V4 Model on Today's Session (27 Jun 2026)")
-    print("  V6: Phase 2 features (81) + H4 Hard Gate + Weighted Average Meta")
+    print("  BACKTEST: V6 Model on June 2026")
+    print("  Phase 2 features (81) + weighted average + CatBoost")
     print("=" * 70)
 
     models, weights = load_models()
@@ -44,12 +42,6 @@ def backtest_today():
     raw_features = fe.compute_all(m5, m15, h1, h4)
     raw_features['time'] = m5['time'].values
 
-    labeler = TripleBarrierLabeler()
-    labeled = labeler.label_dataframe(m5)
-
-    rf = RuleFilters()
-    filtered = rf.apply_all(labeled, raw_features)
-
     engine = SignalEngine({
         'confidence_threshold': 78,
         'session_start': 13,
@@ -58,18 +50,14 @@ def backtest_today():
     })
     scorer = ConfidenceScorer({'threshold': 78})
 
-    today = pd.Timestamp('2026-06-26')
-    session_start = today.replace(hour=13, minute=0, second=0)
-    session_end = today.replace(hour=16, minute=0, second=0)
+    june_start = pd.Timestamp('2026-06-01')
+    june_end = pd.Timestamp('2026-06-30')
+    session_mask = (m5['time'] >= june_start) & (m5['time'] < june_end)
+    session_bars = m5[session_mask]
+    session_indices = session_bars.index.tolist()
 
-    session_mask = (m5['time'] >= session_start) & (m5['time'] < session_end)
-    session_indices = m5[session_mask].index.tolist()
-
-    print(f"\n  Session: {session_start} to {session_end}")
-    print(f"  M5 bars in session: {len(session_indices)}")
-
-    print(f"\n  {'Check':>5s} {'Time':>8s} {'Signal':>8s} {'Conf':>5s} {'H4':>5s} {'Entry':>9s} {'TP':>9s} {'SL':>9s} {'Outcome':>10s} {'PnL':>6s}")
-    print("  " + "-" * 85)
+    print(f"\n  Period: June 2026")
+    print(f"  Session bars (13:00-16:00 UTC): {len(session_indices)}")
 
     signals = []
     check_num = 0
@@ -83,7 +71,7 @@ def backtest_today():
 
         engine_result = engine.generate_signal(feat_series, raw_series, models, weights)
 
-        ts = m5.loc[idx, 'time'].strftime('%H:%M')
+        ts = m5.loc[idx, 'time']
         h4_regime = feat_row.get('h4_regime', 0)
         h4_str = 'BULL' if h4_regime > 0 else ('BEAR' if h4_regime < 0 else 'NEUT')
 
@@ -123,60 +111,58 @@ def backtest_today():
                         break
 
             signals.append({
-                'check': check_num,
-                'time': ts,
+                'date': ts.strftime('%Y-%m-%d'),
+                'time': ts.strftime('%H:%M'),
                 'signal': engine_result['signal'],
                 'confidence': engine_result['confidence'],
                 'h4': h4_str,
                 'entry': entry_price,
                 'tp': tp_price,
                 'sl': sl_price,
+                'tp_pips': tp_pips,
+                'sl_pips': sl_pips,
                 'outcome': outcome,
                 'pnl': pnl,
             })
 
-            outcome_str = f"{outcome}" if outcome != 'OPEN' else 'OPEN'
-            print(f"  {check_num:5d} {ts:>8s} {engine_result['signal']:>8s} {engine_result['confidence']:5.1f} {h4_str:>5s} {entry_price:9.5f} {tp_price:9.5f} {sl_price:9.5f} {outcome_str:>10s} {pnl:+6.1f}")
-        else:
-            if check_num <= 5 or check_num % 10 == 0:
-                print(f"  {check_num:5d} {ts:>8s} {'--':>8s} {'--':>5s} {h4_str:>5s} {'--':>9s} {'--':>9s} {'--':>9s} {engine_result['reason']:>10s} {'--':>6s}")
+    print(f"\n  Total signals: {len(signals)}")
+    if not signals:
+        print("  No signals generated.")
+        return
 
-    print("\n" + "=" * 70)
-    print("  SESSION SUMMARY")
-    print("=" * 70)
-    print(f"  Total checks: {check_num}")
-    print(f"  Signals generated: {len(signals)}")
+    df = pd.DataFrame(signals)
+    closed = df[df['outcome'].isin(['WIN', 'LOSS'])]
+    open_trades = df[df['outcome'] == 'OPEN']
+    wins = df[df['outcome'] == 'WIN']
+    losses = df[df['outcome'] == 'LOSS']
 
-    if signals:
-        wins = [s for s in signals if s['outcome'] == 'WIN']
-        losses = [s for s in signals if s['outcome'] == 'LOSS']
-        open_trades = [s for s in signals if s['outcome'] == 'OPEN']
-        total_pnl = sum(s['pnl'] for s in signals)
+    print(f"\n  Wins: {len(wins)} | Losses: {len(losses)} | Open: {len(open_trades)}")
+    print(f"  Win rate: {len(wins) / len(closed) * 100:.1f}%" if len(closed) > 0 else "  No closed trades")
+    print(f"  Total PnL: {df['pnl'].sum():+.1f} pips")
 
-        print(f"\n  Wins: {len(wins)} | Losses: {len(losses)} | Open: {len(open_trades)}")
-        print(f"  Total PnL: {total_pnl:+.1f} pips")
+    if len(wins) > 0:
+        print(f"  Avg win: +{wins['pnl'].mean():.1f} pips")
+    if len(losses) > 0:
+        print(f"  Avg loss: {losses['pnl'].mean():.1f} pips")
 
-        if wins or losses:
-            closed = wins + losses
-            win_rate = len(wins) / len(closed) * 100 if closed else 0
-            print(f"  Win rate: {win_rate:.1f}%")
+    daily = df.groupby('date').agg(
+        signals=('signal', 'count'),
+        wins=('outcome', lambda x: (x == 'WIN').sum()),
+        losses=('outcome', lambda x: (x == 'LOSS').sum()),
+        pnl=('pnl', 'sum')
+    ).reset_index()
 
-        print(f"\n  {'Check':>5s} {'Time':>8s} {'Signal':>8s} {'Conf':>5s} {'Entry':>9s} {'TP':>9s} {'SL':>9s} {'Outcome':>10s} {'PnL':>6s}")
-        print("  " + "-" * 75)
-        for s in signals:
-            print(f"  {s['check']:5d} {s['time']:>8s} {s['signal']:>8s} {s['confidence']:5.1f} {s['entry']:9.5f} {s['tp']:9.5f} {s['sl']:9.5f} {s['outcome']:>10s} {s['pnl']:+6.1f}")
-    else:
-        print("\n  No signals generated.")
+    print(f"\n  {'Date':>10s} {'Signals':>8s} {'Wins':>5s} {'Losses':>7s} {'PnL':>8s}")
+    print("  " + "-" * 45)
+    for _, row in daily.iterrows():
+        print(f"  {row['date']:>10s} {row['signals']:8d} {row['wins']:5d} {row['losses']:7d} {row['pnl']:+8.1f}")
 
-    print("\n" + "=" * 70)
-    print("  COMPARISON: V3 (no H4 gate) vs V4 (with H4 gate)")
-    print("=" * 70)
-    print(f"  V3 (T=70): 10 SHORT signals, 7 losses, -102.4 pips")
-    print(f"  V4 (T=78): {len(signals)} signals, H4 gate active")
-    if signals:
-        print(f"  V4 PnL: {total_pnl:+.1f} pips")
-    print("=" * 70)
+    print(f"\n  Signal breakdown:")
+    longs = df[df['signal'] == 'LONG']
+    shorts = df[df['signal'] == 'SHORT']
+    print(f"    LONG: {len(longs)} signals, {(longs['outcome']=='WIN').sum()}W / {(longs['outcome']=='LOSS').sum()}L")
+    print(f"    SHORT: {len(shorts)} signals, {(shorts['outcome']=='WIN').sum()}W / {(shorts['outcome']=='LOSS').sum()}L")
 
 
 if __name__ == '__main__':
-    backtest_today()
+    backtest_june()

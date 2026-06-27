@@ -109,6 +109,29 @@ class TechnicalFeatures:
         features['cvd_delta'] = delta_volume
         features['cvd_roc_5'] = pd.Series(delta_volume).rolling(5).sum().pct_change(5)
 
+        macd_hist = features['macd_histogram']
+        features['macd_slope'] = macd_hist.diff(3) / 3
+
+        sma20 = close.rolling(20).mean()
+        std20 = close.rolling(20).std()
+        upper = sma20 + 2 * std20
+        lower = sma20 - 2 * std20
+        bb_pctb = (close - lower) / (upper - lower)
+        bb_width = (upper - lower) / sma20
+        bb_width_min = bb_width.rolling(50).min()
+        bb_width_max = bb_width.rolling(50).max()
+        features['bb_squeeze'] = np.where(
+            (bb_width - bb_width_min) / (bb_width_max - bb_width_min + 1e-10) < 0.2, 1.0, 0.0
+        )
+
+        rsi = features.get('rsi_14', self._rsi(close, 14))
+        rsi_slope = rsi.diff(3) / 3
+        price_slope = close.pct_change(3)
+        features['rsi_divergence'] = np.where(
+            (rsi_slope > 0) & (price_slope < 0), 1.0,
+            np.where((rsi_slope < 0) & (price_slope > 0), -1.0, 0.0)
+        )
+
         return pd.DataFrame(features, index=df.index)
 
     def _rsi(self, close, period):
@@ -169,11 +192,11 @@ class MultiTimeframeFeatures:
             'h1_bearish_bos': self._ffill_to_m5(h1_bos_bear.values, h1_times, m5_times),
         }
 
-        h4_bull = pd.Series(features['h4_bullish'])
-        h4_bear = pd.Series(features['h4_bearish'])
-        h1_a50 = pd.Series(features['h1_above_ema50'])
-        m15_bull = pd.Series(features['m15_rsi_bullish'])
-        m15_bear = pd.Series(features['m15_rsi_bearish'])
+        h4_bull = pd.Series(features['h4_bullish']).fillna(False).astype(bool)
+        h4_bear = pd.Series(features['h4_bearish']).fillna(False).astype(bool)
+        h1_a50 = pd.Series(features['h1_above_ema50']).fillna(False).astype(bool)
+        m15_bull = pd.Series(features['m15_rsi_bullish']).fillna(False).astype(bool)
+        m15_bear = pd.Series(features['m15_rsi_bearish']).fillna(False).astype(bool)
         features['mtf_alignment'] = ((h4_bull | h4_bear).astype(int) + h1_a50.astype(int) + (m15_bull | m15_bear).astype(int)).values
         features['h4_regime'] = (h4_bull.astype(int) - h4_bear.astype(int)).values
 
@@ -231,6 +254,185 @@ class SessionMacroFeatures:
         return pd.DataFrame(rows, index=timestamps.index)
 
 
+class SMCFeatures:
+    def compute(self, df):
+        high = df['high']
+        low = df['low']
+        close = df['close']
+        open_ = df['open']
+        features = {}
+
+        features['fvg_bull'] = self._fair_value_gaps(df, 'bull')
+        features['fvg_bear'] = self._fair_value_gaps(df, 'bear')
+        features['ob_bull'] = self._order_blocks(df, 'bull')
+        features['ob_bear'] = self._order_blocks(df, 'bear')
+        features['bos_bull'] = self._break_of_structure(close, high, low, 'bull')
+        features['bos_bear'] = self._break_of_structure(close, high, low, 'bear')
+        features['liquidity_high'] = self._equal_levels(high, 20)
+        features['liquidity_low'] = self._equal_levels(low, 20)
+        features['displacement'] = self._displacement(df)
+        features['imbalance'] = self._imbalance(df)
+        features['premium_discount'] = self._premium_discount(close, high, low)
+
+        return pd.DataFrame(features, index=df.index)
+
+    def _fair_value_gaps(self, df, direction):
+        high = df['high']
+        low = df['low']
+        if direction == 'bull':
+            gap = low - high.shift(2)
+            fvg = gap.where(gap > 0, 0) * 10000
+        else:
+            gap = high.shift(2) - low
+            fvg = gap.where(gap > 0, 0) * 10000
+        return fvg.rolling(5).max().fillna(0)
+
+    def _order_blocks(self, df, direction):
+        close = df['close']
+        open_ = df['open']
+        high = df['high']
+        low = df['low']
+        body = abs(close - open_)
+        total_range = high - low
+        body_ratio = body / (total_range + 1e-10)
+        bullish_candle = (close > open_).astype(float)
+        bearish_candle = (close < open_).astype(float)
+        strong_body = (body_ratio > 0.6).astype(float)
+        prev_bearish = bearish_candle.shift(1).fillna(0)
+        prev_bullish = bullish_candle.shift(1).fillna(0)
+        if direction == 'bull':
+            ob = bullish_candle * strong_body * prev_bearish
+        else:
+            ob = bearish_candle * strong_body * prev_bullish
+        return ob.rolling(10).max().fillna(0)
+
+    def _break_of_structure(self, close, high, low, direction):
+        lookback = 10
+        if direction == 'bull':
+            swing_high = high.rolling(lookback).max().shift(1)
+            bos = (close > swing_high).astype(float)
+        else:
+            swing_low = low.rolling(lookback).min().shift(1)
+            bos = (close < swing_low).astype(float)
+        return bos.rolling(5).max().fillna(0)
+
+    def _equal_levels(self, price, lookback):
+        threshold = 0.00015
+        result = pd.Series(0.0, index=price.index)
+        for i in range(lookback, len(price)):
+            window = price.iloc[i-lookback:i]
+            diff = (window.values - price.iloc[i]).astype(float)
+            count = (np.abs(diff) < threshold).sum()
+            result.iloc[i] = min(count / 3.0, 1.0)
+        return result
+
+    def _equal_levels_fast(self, price, lookback):
+        threshold = 0.00015
+        price_arr = price.values.astype(float)
+        result = np.zeros(len(price_arr))
+        for i in range(lookback, len(price_arr)):
+            window = price_arr[i-lookback:i]
+            count = np.sum(np.abs(window - price_arr[i]) < threshold)
+            result[i] = min(count / 3.0, 1.0)
+        return pd.Series(result, index=price.index)
+
+    def _displacement(self, df):
+        close = df['close']
+        open_ = df['open']
+        high = df['high']
+        low = df['low']
+        body = abs(close - open_)
+        total_range = high - low
+        atr = total_range.rolling(14).mean()
+        direction = np.sign(close - open_)
+        displacement = direction * body / (atr + 1e-10)
+        return displacement.clip(-3, 3).fillna(0)
+
+    def _imbalance(self, df):
+        close = df['close']
+        high = df['high']
+        low = df['low']
+        candle_range = high - low
+        body_pos = (close - low) / (candle_range + 1e-10)
+        imbalance = (body_pos - 0.5) * 2
+        return imbalance.rolling(3).mean().fillna(0)
+
+    def _premium_discount(self, close, high, low):
+        range_20 = high.rolling(20).max() - low.rolling(20).min()
+        mid = low.rolling(20).min() + range_20 / 2
+        pd_ratio = (close - mid) / (range_20 / 2 + 1e-10)
+        return pd_ratio.clip(-1, 1).fillna(0)
+
+
+class RegimeFeatures:
+    def compute(self, df):
+        close = df['close']
+        high = df['high']
+        low = df['low']
+        features = {}
+
+        tr = pd.concat([
+            high - low,
+            abs(high - close.shift(1)),
+            abs(low - close.shift(1))
+        ], axis=1).max(axis=1)
+
+        adx_data = self._compute_adx(df, period=10)
+        adx = adx_data['adx']
+
+        atr_14 = tr.rolling(14).mean()
+        atr_50 = tr.rolling(50).mean()
+        atr_ratio = atr_14 / atr_50
+
+        features['regime_trending'] = ((adx > 25) & (atr_ratio > 0.8)).astype(float)
+        features['regime_ranging'] = ((adx < 20) & (atr_ratio < 1.2)).astype(float)
+        features['regime_crisis'] = ((atr_ratio > 2.0) | (adx > 40)).astype(float)
+
+        return pd.DataFrame(features, index=df.index)
+
+    def _compute_adx(self, df, period=10):
+        high, low, close = df['high'], df['low'], df['close']
+        plus_dm = high.diff()
+        minus_dm = -low.diff()
+        plus_dm[plus_dm < 0] = 0
+        minus_dm[minus_dm < 0] = 0
+        plus_dm[(plus_dm < minus_dm)] = 0
+        minus_dm[(minus_dm < plus_dm)] = 0
+        tr = pd.concat([high - low, abs(high - close.shift(1)), abs(low - close.shift(1))], axis=1).max(axis=1)
+        atr = tr.rolling(period).mean()
+        plus_di = 100 * (plus_dm.rolling(period).mean() / atr)
+        minus_di = 100 * (minus_dm.rolling(period).mean() / atr)
+        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+        adx = dx.rolling(period).mean()
+        return {'adx': adx, 'plus_di': plus_di, 'minus_di': minus_di}
+
+
+class VolatilityFeatures:
+    def compute(self, df):
+        close = df['close']
+        high = df['high']
+        low = df['low']
+        features = {}
+
+        tr = pd.concat([
+            high - low,
+            abs(high - close.shift(1)),
+            abs(low - close.shift(1))
+        ], axis=1).max(axis=1)
+        atr_14 = tr.rolling(14).mean()
+
+        features['atr_percentile_100'] = atr_14.rolling(100).rank(pct=True).fillna(0.5)
+        features['atr_percentile_50'] = atr_14.rolling(50).rank(pct=True).fillna(0.5)
+
+        atr_med = atr_14.rolling(50).median()
+        features['vol_regime'] = np.where(
+            atr_14 > atr_med * 1.5, 2.0,
+            np.where(atr_14 > atr_med * 1.0, 1.0, 0.0)
+        )
+
+        return pd.DataFrame(features, index=df.index)
+
+
 class FeatureEngineer:
     FEATURE_VECTOR = [
         'return_1', 'return_2', 'return_3', 'return_5', 'return_10', 'return_20',
@@ -251,6 +453,12 @@ class FeatureEngineer:
         'mtf_alignment', 'h1_bullish_bos', 'h1_bearish_bos',
         'session_sin', 'session_cos', 'is_overlap', 'is_london', 'is_ny',
         'dow_0', 'dow_1', 'dow_2', 'dow_3', 'dow_4',
+        'fvg_bull', 'fvg_bear', 'ob_bull', 'ob_bear',
+        'bos_bull', 'bos_bear', 'liquidity_high', 'liquidity_low',
+        'displacement', 'imbalance', 'premium_discount',
+        'regime_trending', 'regime_ranging', 'regime_crisis',
+        'atr_percentile_100', 'atr_percentile_50', 'vol_regime',
+        'macd_slope', 'bb_squeeze', 'rsi_divergence',
     ]
 
     def __init__(self):
@@ -258,14 +466,20 @@ class FeatureEngineer:
         self.technical = TechnicalFeatures()
         self.mtf = MultiTimeframeFeatures()
         self.session = SessionMacroFeatures()
+        self.smc = SMCFeatures()
+        self.regime = RegimeFeatures()
+        self.volatility = VolatilityFeatures()
 
     def compute_all(self, m5_df, m15_df, h1_df, h4_df):
         price_feat = self.price.compute(m5_df)
         tech_feat = self.technical.compute(m5_df)
         mtf_feat = self.mtf.compute(m5_df, m15_df, h1_df, h4_df)
         session_feat = self.session.compute_batch(m5_df['time'])
+        smc_feat = self.smc.compute(m5_df)
+        regime_feat = self.regime.compute(m5_df)
+        vol_feat = self.volatility.compute(m5_df)
 
-        all_features = pd.concat([price_feat, tech_feat, mtf_feat, session_feat], axis=1)
+        all_features = pd.concat([price_feat, tech_feat, mtf_feat, session_feat, smc_feat, regime_feat, vol_feat], axis=1)
         all_features = all_features.replace([np.inf, -np.inf], np.nan)
         return all_features
 

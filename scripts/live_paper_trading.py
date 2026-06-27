@@ -17,7 +17,7 @@ from src.confidence_scorer import ConfidenceScorer
 from src.signal_engine import SignalEngine
 
 SIGNALS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'eurusd', 'live_signals.json')
-MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'v5_phase3')
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'v6')
 
 running = True
 
@@ -188,7 +188,12 @@ def main():
 
     engineer = FeatureEngineer()
     scorer = ConfidenceScorer({'threshold': 78})
-    engine = SignalEngine({'confidence_threshold': 78, 'session_start': 13, 'session_end': 16})
+    engine = SignalEngine({
+        'confidence_threshold': 78,
+        'session_start': 13,
+        'session_end': 16,
+        'feature_pipeline': pipeline,
+    })
     rule_filters = RuleFilters()
 
     print("\nConnecting to MT5...")
