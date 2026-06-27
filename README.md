@@ -110,9 +110,7 @@ Key parameters in `config/config.yaml`:
 | `tp_atr_multiplier` | 4.5 | TP = 4.5x ATR(14) |
 | `sl_atr_multiplier` | 1.5 | SL = 1.5x ATR(14) |
 | `min_tp_pips` | 9 | Minimum TP in pips |
-| `max_tp_pips` | 45 | Maximum TP in pips |
 | `min_sl_pips` | 3 | Minimum SL in pips |
-| `max_sl_pips` | 15 | Maximum SL in pips |
 | `session_start` | 13 | Trading session start (UTC) |
 | `session_end` | 16 | Trading session end (UTC) |
 | `min_confidence` | 78 | Minimum confidence threshold |

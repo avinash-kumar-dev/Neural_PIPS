@@ -14,9 +14,7 @@ class SignalEngine:
         self.session_end = cfg.get('session_end', 16)
         self.confidence_threshold = cfg.get('confidence_threshold', 78)
         self.min_tp_pips = cfg.get('min_tp_pips', 9)
-        self.max_tp_pips = cfg.get('max_tp_pips', 45)
         self.min_sl_pips = cfg.get('min_sl_pips', 3)
-        self.max_sl_pips = cfg.get('max_sl_pips', 15)
 
     def generate_signal(self, features_row, raw_features_row, model, meta_or_weights):
         if 'time' not in features_row:
@@ -50,8 +48,8 @@ class SignalEngine:
         if atr_pips < self.min_sl_pips:
             return self._no_trade('atr_too_low')
 
-        tp_pips = min(max(atr_pips * 4.5, self.min_tp_pips), self.max_tp_pips)
-        sl_pips = min(max(atr_pips * 1.5, self.min_sl_pips), self.max_sl_pips)
+        tp_pips = max(atr_pips * 4.5, self.min_tp_pips)
+        sl_pips = max(atr_pips * 1.5, self.min_sl_pips)
 
         signal_dir = 'LONG' if ml_pred == 1 else 'SHORT'
 

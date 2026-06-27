@@ -6,9 +6,7 @@ labeling:
   sl_atr_multiplier: 1.5
   atr_period: 14
   min_tp_pips: 9
-  max_tp_pips: 45
   min_sl_pips: 3
-  max_sl_pips: 15
   horizon: 20
 
 models:
