@@ -390,5 +390,75 @@
       }
     }
   },
+    "v8_retrained": {
+      "description": "V8 retrain: direction + quality models trained on pre-June + June 1-24, tested June 25-26 only.",
+      "train_method": "single_train_test_split",
+      "train_period": "2025-02-21 to 2026-06-24",
+      "test_period": "2026-06-25 to 2026-06-26",
+      "n_features_raw": 99,
+      "n_features_scaled_direction": 77,
+      "n_features_scaled_quality": 99,
+      "direction_model": {
+        "scale_pos_weight": 5.63,
+        "ensemble_weights": [0.333, 0.333, 0.333],
+        "train_accuracy": 0.895,
+        "train_time_seconds": 44.3
+      },
+      "quality_model": {
+        "scale_pos_weight": 1.0,
+        "ensemble_weights": [0.333, 0.333, 0.333],
+        "train_accuracy": 0.937,
+        "train_time_seconds": 53.3
+      },
+      "pipeline": {
+        "input_features": 99,
+        "output_features_direction": 77,
+        "output_features_quality": 99,
+        "method": "VarianceThreshold(0.001) + RobustScaler"
+      },
+      "backtest_june25_26": {
+        "total_signals": 1,
+        "long_signals": 0,
+        "short_signals": 1,
+        "wins": 0,
+        "losses": 0,
+        "open": 1,
+        "win_rate": 0.0,
+        "total_pnl_pips": 0.0,
+        "signals_per_day": 0.5,
+        "quality_gate_threshold": 0.55,
+        "signal_1": {
+          "signal": "SHORT",
+          "confidence": 79.8,
+          "ml_confidence": 0.09,
+          "quality_score": 0.579,
+          "entry_price": 1.14054,
+          "tp_price": 1.13769,
+          "sl_price": 1.14149,
+          "tp_pips": 28.5,
+          "sl_pips": 9.5,
+          "result": "OPEN"
+        }
+      },
+      "known_issues": [
+        "Quality gate too aggressive — only 1 signal in 2 days",
+        "Quality model accuracy barely above random (51.6% walk-forward)",
+        "Need to lower quality_threshold or reconsider approach"
+      ],
+      "files": {
+        "direction_xgboost": "models/v8_retrained/direction_xgboost.joblib",
+        "direction_lightgbm": "models/v8_retrained/direction_lightgbm.joblib",
+        "direction_catboost": "models/v8_retrained/direction_catboost.joblib",
+        "direction_weights": "models/v8_retrained/direction_weights.joblib",
+        "direction_pipeline": "models/v8_retrained/direction_pipeline.joblib",
+        "quality_xgboost": "models/v8_retrained/quality_xgboost.joblib",
+        "quality_lightgbm": "models/v8_retrained/quality_lightgbm.joblib",
+        "quality_catboost": "models/v8_retrained/quality_catboost.joblib",
+        "quality_weights": "models/v8_retrained/quality_weights.joblib",
+        "feature_names": "models/v8_retrained/feature_names.json"
+      },
+      "status": "experimental"
+    }
+  },
   "current_production": "v7"
 }
