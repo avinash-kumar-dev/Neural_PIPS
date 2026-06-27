@@ -18,8 +18,8 @@ class LiveFeatureEngineer:
         raw_60 = last_row[self.engineer.FEATURE_VECTOR].values.reshape(1, -1)
         raw_60 = np.nan_to_num(raw_60, nan=0.0, posinf=0.0, neginf=0.0)
 
-        feat_names = self.pipeline.feature_names_in_
-        raw_dict = dict(zip(feat_names, raw_60[0]))
+        raw_dict = dict(zip(self.engineer.FEATURE_VECTOR, raw_60[0]))
+        raw_dict['atr_pips'] = self.compute_atr_pips(m5_df)
 
         scaled = self.pipeline.transform(raw_60)
         scaled_names = self.pipeline.feature_names_out_

@@ -27,7 +27,7 @@ class SignalEngine:
 
         ml_pred, ml_confidence = self._predict(features_row, model, meta_or_weights)
 
-        h4_regime = features_row.get('h4_regime', 0)
+        h4_regime = raw_features_row.get('h4_regime', 0)
         if h4_regime > 0 and ml_pred == 0:
             return self._no_trade('h4_bullish_short_blocked')
         if h4_regime < 0 and ml_pred == 1:
@@ -44,7 +44,10 @@ class SignalEngine:
         if confidence < self.confidence_threshold:
             return self._no_trade(f'low_confidence_{confidence:.0f}')
 
-        atr_pips = raw_features_row.get('atr_pips', 10)
+        atr_pips = raw_features_row.get('atr_pips', None)
+        if atr_pips is None:
+            atr_14 = raw_features_row.get('atr_14', 0)
+            atr_pips = atr_14 * 10000
         if atr_pips < self.min_sl_pips:
             return self._no_trade('atr_too_low')
 
