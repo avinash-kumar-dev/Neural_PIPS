@@ -13,15 +13,19 @@ from src.signal_engine import SignalEngine
 from src.confidence_scorer import ConfidenceScorer
 from src.rule_filters import RuleFilters
 
-MODELS_DIR = 'models/v6'
+MODELS_DIR = 'models/v7'
 
 
 def load_models():
     xgb = joblib.load(os.path.join(MODELS_DIR, 'xgboost.joblib'))
     lgbm = joblib.load(os.path.join(MODELS_DIR, 'lightgbm.joblib'))
-    cb = joblib.load(os.path.join(MODELS_DIR, 'catboost.joblib'))
     weights = joblib.load(os.path.join(MODELS_DIR, 'ensemble_weights.joblib'))
-    return [xgb, lgbm, cb], weights
+    models = [xgb, lgbm]
+    cb_path = os.path.join(MODELS_DIR, 'catboost.joblib')
+    if os.path.exists(cb_path):
+        cb = joblib.load(cb_path)
+        models.append(cb)
+    return models, weights
 
 
 def backtest_today():
@@ -52,8 +56,18 @@ def backtest_today():
 
     engine = SignalEngine({
         'confidence_threshold': 78,
-        'session_start': 13,
-        'session_end': 16,
+        'ml_gate': 0.75,
+        'confluence_min': 2,
+        'max_spread_pips': 0.5,
+        'min_atr_pips': 3.0,
+        'max_atr_pips': 20.0,
+        'min_atr_ratio': 0.5,
+        'max_atr_ratio': 2.5,
+        'sessions': [
+            {'start': 7, 'end': 9},
+            {'start': 13, 'end': 16},
+            {'start': 17, 'end': 20},
+        ],
         'feature_pipeline': feature_pipeline,
     })
     scorer = ConfidenceScorer({'threshold': 78})

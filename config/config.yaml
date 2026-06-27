@@ -12,42 +12,51 @@ labeling:
 models:
   xgboost:
     n_estimators: 300
-    max_depth: 3
+    max_depth: 8
     learning_rate: 0.05
     subsample: 0.8
     colsample_bytree: 0.8
     min_child_weight: 5
-    reg_alpha: 1.0
-    reg_lambda: 1.0
-    gamma: 0.1
     eval_metric: "logloss"
     early_stopping_rounds: 20
   lightgbm:
-    n_estimators: 150
-    max_depth: 4
+    n_estimators: 300
+    max_depth: 8
     learning_rate: 0.05
     subsample: 0.8
     colsample_bytree: 0.8
     min_child_weight: 5
-    reg_alpha: 1.0
-    reg_lambda: 1.0
   catboost:
-    iterations: 200
-    depth: 4
+    iterations: 300
+    depth: 8
     learning_rate: 0.05
-    l2_leaf_reg: 3.0
 
 threshold:
   min_confidence: 78
+  ml_gate: 0.75
+  confluence_min: 2
+
+sessions:
+  - name: "london_open"
+    start_utc: 7
+    end_utc: 9
+  - name: "overlap"
+    start_utc: 13
+    end_utc: 16
+  - name: "ny_afternoon"
+    start_utc: 17
+    end_utc: 20
 
 session:
-  start_utc: 13
-  end_utc: 16
+  start_utc: 7
+  end_utc: 20
 
 volatility:
   min_atr_ratio: 0.5
   max_atr_ratio: 2.5
   atr_period: 14
+  min_atr_pips: 3.0
+  max_atr_pips: 20.0
 
 spread:
   max_pips: 0.5
@@ -65,11 +74,11 @@ risk:
   max_daily_loss_pct: 3.0
 
 validation:
-  n_windows: 30
+  n_windows: 12
   train_months: 6
   test_months: 1
   purge_bars: 20
-  embargo_bars: 20
+  embargo_bars: 48
 
 mt5:
   symbol: "EURUSD"

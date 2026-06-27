@@ -17,7 +17,7 @@ from src.confidence_scorer import ConfidenceScorer
 from src.signal_engine import SignalEngine
 
 SIGNALS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'eurusd', 'live_signals.json')
-MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'v6')
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'v7')
 
 running = True
 
@@ -108,11 +108,32 @@ def check_signal_outcome(signal_entry, m5_df):
     return signal_entry
 
 
+SESSIONS = [
+    {'start': 7, 'end': 9, 'name': 'London Open'},
+    {'start': 13, 'end': 16, 'name': 'Overlap'},
+    {'start': 17, 'end': 20, 'name': 'NY Afternoon'},
+]
+
+
+def in_session(hour):
+    for s in SESSIONS:
+        if s['start'] <= hour < s['end']:
+            return True
+    return False
+
+
+def get_session_name(hour):
+    for s in SESSIONS:
+        if s['start'] <= hour < s['end']:
+            return s['name']
+    return None
+
+
 def run_check(fetcher, engineer, pipeline, models, weights, scorer, engine):
     now_utc = datetime.now(timezone.utc)
     hour = now_utc.hour
 
-    if not (13 <= hour < 16):
+    if not in_session(hour):
         return None, 'outside_session'
 
     try:
@@ -173,8 +194,8 @@ def run_check(fetcher, engineer, pipeline, models, weights, scorer, engine):
 def main():
     print("=" * 60)
     print("  EUR/USD Live Paper Trading")
-    print("  Session: 13:00-16:00 UTC (18:00-21:00 PKT)")
-    print("  Threshold: 78 | TP:SL = 3:1 | V5 Phase 3 (XGB+LGBM+CatBoost weighted avg)")
+    print("  Sessions: 07-09, 13-16, 17-20 UTC")
+    print("  Threshold: 78 | TP:SL = 3:1 | V7 (XGB+LGBM+CatBoost)")
     print("=" * 60)
 
     print("\nLoading models...")
@@ -190,8 +211,14 @@ def main():
     scorer = ConfidenceScorer({'threshold': 78})
     engine = SignalEngine({
         'confidence_threshold': 78,
-        'session_start': 13,
-        'session_end': 16,
+        'ml_gate': 0.75,
+        'confluence_min': 2,
+        'max_spread_pips': 0.5,
+        'min_atr_pips': 3.0,
+        'max_atr_pips': 20.0,
+        'min_atr_ratio': 0.5,
+        'max_atr_ratio': 2.5,
+        'sessions': SESSIONS,
         'feature_pipeline': pipeline,
     })
     rule_filters = RuleFilters()
@@ -213,12 +240,24 @@ def main():
     print(f"\nCurrent time: {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC")
     print(f"              {(now_utc + timedelta(hours=5)).strftime('%Y-%m-%d %H:%M:%S')} PKT")
 
-    if not (13 <= now_utc.hour < 16):
-        next_session = now_utc.replace(hour=13, minute=0, second=0, microsecond=0)
-        if now_utc.hour >= 16:
-            next_session += timedelta(days=1)
+    if not in_session(now_utc.hour):
+        next_session = None
+        for s in SESSIONS:
+            if now_utc.hour < s['start']:
+                candidate = now_utc.replace(hour=s['start'], minute=0, second=0, microsecond=0)
+                if candidate > now_utc:
+                    next_session = candidate
+                    break
+            elif now_utc.hour >= s['end'] and now_utc.hour < 17:
+                candidate = now_utc.replace(hour=17, minute=0, second=0, microsecond=0)
+                if candidate > now_utc:
+                    next_session = candidate
+                    break
+        if next_session is None:
+            tomorrow = now_utc + timedelta(days=1)
+            next_session = tomorrow.replace(hour=7, minute=0, second=0, microsecond=0)
         wait_seconds = (next_session - now_utc).total_seconds()
-        print(f"\nOutside session. Next session starts at {next_session.strftime('%H:%M')} UTC")
+        print(f"\nOutside session. Next session: {next_session.strftime('%H:%M')} UTC")
         print(f"Waiting {wait_seconds/3600:.1f} hours...")
 
         while running and datetime.now(timezone.utc) < next_session:
@@ -236,9 +275,13 @@ def main():
     while running:
         now_utc = datetime.now(timezone.utc)
 
-        if not (13 <= now_utc.hour < 16):
-            print(f"\n[{now_utc.strftime('%H:%M:%S')}] Session ended. Stopping.")
-            break
+        if not in_session(now_utc.hour):
+            session_name = get_session_name(now_utc.hour)
+            if session_name is None:
+                print(f"\n[{now_utc.strftime('%H:%M:%S')}] All sessions ended. Stopping.")
+                break
+            time.sleep(30)
+            continue
 
         check_count += 1
         signal_obj, reason = run_check(fetcher, engineer, pipeline, models, weights, scorer, engine)

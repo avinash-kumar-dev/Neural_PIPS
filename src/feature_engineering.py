@@ -433,6 +433,78 @@ class VolatilityFeatures:
         return pd.DataFrame(features, index=df.index)
 
 
+class TimeFeatures:
+    def compute(self, timestamps):
+        ts = pd.to_datetime(timestamps)
+        features = {}
+
+        hour = ts.dt.hour
+        minute = ts.dt.minute
+        dow = ts.dt.dayofweek
+
+        hour_rad = 2 * np.pi * (hour + minute / 60.0) / 24.0
+        features['hour_sin'] = np.sin(hour_rad).values
+        features['hour_cos'] = np.cos(hour_rad).values
+
+        dow_rad = 2 * np.pi * dow / 7.0
+        features['dow_sin'] = np.sin(dow_rad).values
+        features['dow_cos'] = np.cos(dow_rad).values
+
+        minute_of_day = hour * 60 + minute
+        features['minute_of_day'] = minute_of_day.values
+
+        for session_name, sh, eh in [('london', 7, 9), ('overlap', 13, 16), ('ny', 17, 20)]:
+            session_minutes = (eh - sh) * 60
+            progress = np.where(
+                (hour >= sh) & (hour < eh),
+                (minute_of_day - sh * 60) / session_minutes,
+                0.0
+            )
+            features[f'{session_name}_progress'] = progress
+
+        features['hour_of_day'] = hour.values.astype(float)
+        features['is_weekend'] = (dow >= 5).astype(float).values
+
+        return pd.DataFrame(features, index=timestamps.index)
+
+    def compute_single(self, ts):
+        ts = pd.to_datetime(ts)
+        features = {}
+
+        hour = ts.hour
+        minute = ts.minute
+        dow = ts.weekday()
+
+        hour_rad = 2 * np.pi * (hour + minute / 60.0) / 24.0
+        features['hour_sin'] = np.sin(hour_rad)
+        features['hour_cos'] = np.cos(hour_rad)
+
+        dow_rad = 2 * np.pi * dow / 7.0
+        features['dow_sin'] = np.sin(dow_rad)
+        features['dow_cos'] = np.cos(dow_rad)
+
+        minute_of_day = hour * 60 + minute
+        features['minute_of_day'] = minute_of_day
+
+        features['is_london_open'] = float(7 <= hour < 9)
+        features['is_overlap'] = float(13 <= hour < 16)
+        features['is_ny_afternoon'] = float(17 <= hour < 20)
+        features['is_any_session'] = float(features['is_london_open'] or features['is_overlap'] or features['is_ny_afternoon'])
+
+        for session_name, sh, eh in [('london', 7, 9), ('overlap', 13, 16), ('ny', 17, 20)]:
+            session_minutes = (eh - sh) * 60
+            if sh <= hour < eh:
+                progress = (minute_of_day - sh * 60) / session_minutes
+            else:
+                progress = 0.0
+            features[f'{session_name}_progress'] = progress
+
+        features['hour_of_day'] = float(hour)
+        features['is_weekend'] = float(dow >= 5)
+
+        return features
+
+
 class FeatureEngineer:
     FEATURE_VECTOR = [
         'return_1', 'return_2', 'return_3', 'return_5', 'return_10', 'return_20',
@@ -459,6 +531,10 @@ class FeatureEngineer:
         'regime_trending', 'regime_ranging', 'regime_crisis',
         'atr_percentile_100', 'atr_percentile_50', 'vol_regime',
         'macd_slope', 'bb_squeeze', 'rsi_divergence',
+        'hour_sin', 'hour_cos', 'dow_sin', 'dow_cos',
+        'minute_of_day', 'is_london_open', 'is_ny_afternoon',
+        'is_any_session', 'london_progress', 'overlap_progress', 'ny_progress',
+        'hour_of_day', 'is_weekend',
     ]
 
     def __init__(self):
@@ -469,6 +545,7 @@ class FeatureEngineer:
         self.smc = SMCFeatures()
         self.regime = RegimeFeatures()
         self.volatility = VolatilityFeatures()
+        self.time = TimeFeatures()
 
     def compute_all(self, m5_df, m15_df, h1_df, h4_df):
         price_feat = self.price.compute(m5_df)
@@ -478,8 +555,9 @@ class FeatureEngineer:
         smc_feat = self.smc.compute(m5_df)
         regime_feat = self.regime.compute(m5_df)
         vol_feat = self.volatility.compute(m5_df)
+        time_feat = self.time.compute(m5_df['time'])
 
-        all_features = pd.concat([price_feat, tech_feat, mtf_feat, session_feat, smc_feat, regime_feat, vol_feat], axis=1)
+        all_features = pd.concat([price_feat, tech_feat, mtf_feat, session_feat, smc_feat, regime_feat, vol_feat, time_feat], axis=1)
         all_features = all_features.replace([np.inf, -np.inf], np.nan)
         return all_features
 

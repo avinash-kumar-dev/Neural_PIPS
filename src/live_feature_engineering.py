@@ -15,13 +15,14 @@ class LiveFeatureEngineer:
         last_row = all_features.loc[last_idx].copy()
         last_row['time'] = m5_df['time'].iloc[-1]
 
-        raw_60 = last_row[self.engineer.FEATURE_VECTOR].values.reshape(1, -1)
-        raw_60 = np.nan_to_num(raw_60, nan=0.0, posinf=0.0, neginf=0.0)
+        n_features = len(self.engineer.FEATURE_VECTOR)
+        raw_values = last_row[self.engineer.FEATURE_VECTOR].values.reshape(1, -1)
+        raw_values = np.nan_to_num(raw_values, nan=0.0, posinf=0.0, neginf=0.0)
 
-        raw_dict = dict(zip(self.engineer.FEATURE_VECTOR, raw_60[0]))
+        raw_dict = dict(zip(self.engineer.FEATURE_VECTOR, raw_values[0]))
         raw_dict['atr_pips'] = self.compute_atr_pips(m5_df)
 
-        scaled = self.pipeline.transform(raw_60)
+        scaled = self.pipeline.transform(raw_values)
         scaled_names = self.pipeline.feature_names_out_
         scaled_dict = dict(zip(scaled_names, scaled[0]))
 
