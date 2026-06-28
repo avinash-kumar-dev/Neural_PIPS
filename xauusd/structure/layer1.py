@@ -26,6 +26,8 @@ def compute_layer1(
     n = len(result)
     bias = np.full(n, NO_BIAS, dtype=int)
 
+    current_direction = 0
+
     for i in range(n):
         smc_direction = 0
         if result["bos_bullish"].iloc[i]:
@@ -37,12 +39,15 @@ def compute_layer1(
         elif result["choch_bearish"].iloc[i]:
             smc_direction = -1
 
+        if smc_direction != 0:
+            current_direction = smc_direction
+
         ema_dir = result["ema_bias"].iloc[i]
 
-        if smc_direction == 0:
+        if current_direction == 0:
             bias[i] = NO_BIAS
-        elif ema_dir == 0 or smc_direction == ema_dir:
-            bias[i] = smc_direction
+        elif ema_dir == 0 or current_direction == ema_dir:
+            bias[i] = current_direction
         else:
             bias[i] = NO_BIAS
 

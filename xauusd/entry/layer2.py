@@ -50,30 +50,37 @@ def compute_layer2(
     for i in range(n):
         bias = layer1_bias.iloc[i] if i < len(layer1_bias) else NO_BIAS
 
+        rsi_ok_long = not result["rsi_overbought"].iloc[i] if "rsi_overbought" in result.columns else True
+        rsi_ok_short = not result["rsi_oversold"].iloc[i] if "rsi_oversold" in result.columns else True
+        macd_ok_long = result["macd_cross_bullish"].iloc[i] if "macd_cross_bullish" in result.columns else True
+        macd_ok_short = result["macd_cross_bearish"].iloc[i] if "macd_cross_bearish" in result.columns else True
+        indicator_long = rsi_ok_long or macd_ok_long
+        indicator_short = rsi_ok_short or macd_ok_short
+
         if bias == LONG_ONLY:
-            if result["ob_bull_signal"].iloc[i]:
+            if result["ob_bull_signal"].iloc[i] and indicator_long:
                 long_entry[i] = True
                 long_sl[i] = result["ob_bull_sl"].iloc[i]
                 long_trigger[i] = "OB"
-            elif result["fvg_bull_hold"].iloc[i]:
+            elif result["fvg_bull_hold"].iloc[i] and indicator_long:
                 long_entry[i] = True
                 long_sl[i] = result["fvg_bull_sl"].iloc[i]
                 long_trigger[i] = "FVG_HOLD"
-            elif result["fvg_bull_fill"].iloc[i]:
+            elif result["fvg_bull_fill"].iloc[i] and indicator_long:
                 long_entry[i] = True
                 long_sl[i] = result["fvg_bull_sl"].iloc[i]
                 long_trigger[i] = "FVG_FILL"
 
         elif bias == SHORT_ONLY:
-            if result["ob_bear_signal"].iloc[i]:
+            if result["ob_bear_signal"].iloc[i] and indicator_short:
                 short_entry[i] = True
                 short_sl[i] = result["ob_bear_sl"].iloc[i]
                 short_trigger[i] = "OB"
-            elif result["fvg_bear_hold"].iloc[i]:
+            elif result["fvg_bear_hold"].iloc[i] and indicator_short:
                 short_entry[i] = True
                 short_sl[i] = result["fvg_bear_sl"].iloc[i]
                 short_trigger[i] = "FVG_HOLD"
-            elif result["fvg_bear_fill"].iloc[i]:
+            elif result["fvg_bear_fill"].iloc[i] and indicator_short:
                 short_entry[i] = True
                 short_sl[i] = result["fvg_bear_sl"].iloc[i]
                 short_trigger[i] = "FVG_FILL"

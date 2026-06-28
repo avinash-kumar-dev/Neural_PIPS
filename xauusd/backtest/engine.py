@@ -21,6 +21,8 @@ class Trade:
     trigger: str = ""
     module: str = ""
     costs_pips: float = 0.0
+    lots: float = 0.01
+    be_hit: bool = False
 
 
 @dataclass
@@ -52,11 +54,16 @@ class BacktestEngine:
                 trade = open_trade
 
                 if trade.direction == 1:
+                    if not trade.be_hit and bar["high"] >= trade.tp1:
+                        trade.be_hit = True
+                        trade.sl = trade.entry_price
+
                     if bar["low"] <= trade.sl:
                         trade.exit_time = bar["datetime"]
                         trade.exit_price = trade.sl
                         trade.pnl_pips = (trade.sl - trade.entry_price) / PIP_VALUE - trade.costs_pips
-                        trade.outcome = "LOSS"
+                        trade.outcome = "WIN" if trade.sl >= trade.entry_price else "LOSS"
+                        equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
                         trades.append(trade)
                         open_trade = None
                     elif bar["high"] >= trade.tp2:
@@ -64,14 +71,20 @@ class BacktestEngine:
                         trade.exit_price = trade.tp2
                         trade.pnl_pips = (trade.tp2 - trade.entry_price) / PIP_VALUE - trade.costs_pips
                         trade.outcome = "WIN"
+                        equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
                         trades.append(trade)
                         open_trade = None
                 else:
+                    if not trade.be_hit and bar["low"] <= trade.tp1:
+                        trade.be_hit = True
+                        trade.sl = trade.entry_price
+
                     if bar["high"] >= trade.sl:
                         trade.exit_time = bar["datetime"]
                         trade.exit_price = trade.sl
                         trade.pnl_pips = (trade.entry_price - trade.sl) / PIP_VALUE - trade.costs_pips
-                        trade.outcome = "LOSS"
+                        trade.outcome = "WIN" if trade.sl <= trade.entry_price else "LOSS"
+                        equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
                         trades.append(trade)
                         open_trade = None
                     elif bar["low"] <= trade.tp2:
@@ -79,6 +92,7 @@ class BacktestEngine:
                         trade.exit_price = trade.tp2
                         trade.pnl_pips = (trade.entry_price - trade.tp2) / PIP_VALUE - trade.costs_pips
                         trade.outcome = "WIN"
+                        equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
                         trades.append(trade)
                         open_trade = None
 
@@ -113,7 +127,11 @@ class BacktestEngine:
                         tp1 = entry_price - sl_pips * PIP_VALUE
                         tp2 = entry_price - tp2_pips * PIP_VALUE
 
-                    costs_pips = self.config.spread_pips + self.config.slippage_pips + (self.config.commission_per_lot / 10)
+                    costs_pips = self.config.spread_pips + self.config.slippage_pips + (self.config.commission_per_lot / (PIP_VALUE * 100))
+
+                    risk_amount = equity * self.config.risk_per_trade
+                    lots = risk_amount / (sl_pips * PIP_VALUE * 100) if sl_pips > 0 else 0
+                    lots = round(max(lots, 0.01), 2)
 
                     open_trade = Trade(
                         entry_time=df.iloc[i]["datetime"],
@@ -125,6 +143,7 @@ class BacktestEngine:
                         trigger=trigger,
                         module="trend",
                         costs_pips=costs_pips,
+                        lots=lots,
                     )
 
         if open_trade is not None:

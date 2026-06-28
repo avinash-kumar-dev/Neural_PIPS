@@ -85,10 +85,18 @@ def check_fvg_retest(df: pd.DataFrame, max_age: int = 30) -> pd.DataFrame:
                 fvg_bull_hold[i] = True
                 fvg_bull_sl[i] = l
                 break
+            if lows[i] <= l:
+                fvg_bull_fill[i] = True
+                fvg_bull_sl[i] = l
+                break
 
         for idx, h, l in bear_q:
             if highs[i] >= l and highs[i] <= h and closes[i] < opens[i]:
                 fvg_bear_hold[i] = True
+                fvg_bear_sl[i] = h
+                break
+            if highs[i] >= h:
+                fvg_bear_fill[i] = True
                 fvg_bear_sl[i] = h
                 break
 

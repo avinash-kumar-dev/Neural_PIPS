@@ -72,6 +72,8 @@ def compute_voting_signals(
     result["short_trigger"] = short_triggers
     result["long_votes"] = long_votes
     result["short_votes"] = short_votes
-    result["layer3_confirmed"] = True
+
+    trend_layer3 = trend["layer3_confirmed"].values if "layer3_confirmed" in trend.columns else np.ones(n, dtype=bool)
+    result["layer3_confirmed"] = trend_layer3
 
     return result
