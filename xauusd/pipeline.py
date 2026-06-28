@@ -19,12 +19,14 @@ from xauusd.entry.indicator_triggers import compute_indicator_triggers
 from xauusd.confirmation.layer3 import compute_layer3
 from xauusd.execution.confluence import compute_confluence_score
 from xauusd.execution.filters import compute_session_filter, compute_anti_clustering
+from xauusd.entry.m5_alignment import align_m5_to_m15
 
 
 def run_full_pipeline(
     df: pd.DataFrame,
     min_confluence: float = 35.0,
     min_rr: float = 2.0,
+    df_m5: pd.DataFrame = None,
 ) -> pd.DataFrame:
     result = df.copy()
 
@@ -189,5 +191,9 @@ def run_full_pipeline(
 
     result["long_entry"] = result["long_entry_filtered"] & result["layer3_confirmed"] & result["in_session"]
     result["short_entry"] = result["short_entry_filtered"] & result["layer3_confirmed"] & result["in_session"]
+
+    if df_m5 is not None:
+        print("  Aligning M5 confirmation...")
+        result = align_m5_to_m15(result, df_m5)
 
     return result

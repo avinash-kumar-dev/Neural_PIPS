@@ -37,8 +37,8 @@ def compute_session_filter(
 
 def compute_anti_clustering(
     df: pd.DataFrame,
-    min_bars_between: int = 6,
-    max_trades_per_session: int = 3,
+    min_bars_between: int = 3,
+    max_trades_per_session: int = 5,
     max_consecutive_losses: int = 3,
 ) -> pd.DataFrame:
     result = df.copy()

@@ -3,16 +3,18 @@ import numpy as np
 
 
 CONFLUENCE_FACTORS = {
-    "market_structure": 0.15,
-    "regime": 0.12,
-    "liquidity_sweep": 0.10,
-    "ob_proximity": 0.10,
-    "fvg_proximity": 0.08,
-    "mtf_alignment": 0.15,
-    "session": 0.10,
-    "volume": 0.08,
-    "rsi_momentum": 0.07,
+    "market_structure": 0.13,
+    "regime": 0.10,
+    "liquidity_sweep": 0.08,
+    "ob_proximity": 0.08,
+    "fvg_proximity": 0.07,
+    "mtf_alignment": 0.13,
+    "session": 0.08,
+    "volume": 0.07,
+    "rsi_momentum": 0.06,
     "risk_reward": 0.05,
+    "m5_confirmation": 0.15,
+    "m5_quality": 0.10,
 }
 
 
@@ -110,6 +112,22 @@ def compute_confluence_score(
     sl_vals = df.get(sl_col, pd.Series(np.nan, index=df.index)).values
     rr = np.where(~pd.isna(sl_vals) & (sl_vals > 0), 1.0, 0.0)
 
+    if direction == 1:
+        m5_confirm = np.where(df.get("m5_bull_confirm", False), 1.0,
+                     np.where(df.get("m5_has_mss", False), 0.7,
+                     np.where(df.get("m5_has_rejection", False), 0.6,
+                     np.where(df.get("m5_has_engulfing", False), 0.5, 0.0))))
+    else:
+        m5_confirm = np.where(df.get("m5_bear_confirm", False), 1.0,
+                     np.where(df.get("m5_has_mss", False), 0.7,
+                     np.where(df.get("m5_has_rejection", False), 0.6,
+                     np.where(df.get("m5_has_engulfing", False), 0.5, 0.0))))
+
+    m5_quality = np.where(
+        df.get("m5_has_volume", False) & (m5_confirm > 0), 1.0,
+        np.where(m5_confirm > 0, 0.5, 0.0)
+    )
+
     total = (
         ms * CONFLUENCE_FACTORS["market_structure"] +
         regime * CONFLUENCE_FACTORS["regime"] +
@@ -120,7 +138,9 @@ def compute_confluence_score(
         sess * CONFLUENCE_FACTORS["session"] +
         vol * CONFLUENCE_FACTORS["volume"] +
         rsi_score * CONFLUENCE_FACTORS["rsi_momentum"] +
-        rr * CONFLUENCE_FACTORS["risk_reward"]
+        rr * CONFLUENCE_FACTORS["risk_reward"] +
+        m5_confirm * CONFLUENCE_FACTORS["m5_confirmation"] +
+        m5_quality * CONFLUENCE_FACTORS["m5_quality"]
     )
 
     return pd.Series(total * 100, index=df.index)

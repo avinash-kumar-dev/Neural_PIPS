@@ -15,6 +15,7 @@ def run_backtest(
     min_rr: float = 2.0,
     initial_equity: float = 1000.0,
     risk_per_trade: float = 0.03,
+    data_m5_path: str = None,
 ) -> dict:
     print(f"Loading data from {data_path}...")
     df = pd.read_parquet(data_path)
@@ -27,8 +28,20 @@ def run_backtest(
             df["datetime"] = df.index
             df = df.reset_index(drop=True)
 
+    df_m5 = None
+    if data_m5_path:
+        print(f"Loading M5 data from {data_m5_path}...")
+        df_m5 = pd.read_parquet(data_m5_path)
+        print(f"Loaded {len(df_m5)} M5 bars")
+        if "datetime" not in df_m5.columns:
+            if "time" in df_m5.columns:
+                df_m5["datetime"] = pd.to_datetime(df_m5["time"], unit="s")
+            elif isinstance(df_m5.index, pd.DatetimeIndex):
+                df_m5["datetime"] = df_m5.index
+                df_m5 = df_m5.reset_index(drop=True)
+
     print(f"Running full pipeline with min_confluence={min_confluence}...")
-    signals = run_full_pipeline(df, min_confluence=min_confluence, min_rr=min_rr)
+    signals = run_full_pipeline(df, min_confluence=min_confluence, min_rr=min_rr, df_m5=df_m5)
 
     long_signals = signals["long_entry"].sum()
     short_signals = signals["short_entry"].sum()
@@ -54,6 +67,7 @@ def run_backtest(
     print(f"Total trades: {metrics.get('total_trades', 0)}")
     print(f"Wins: {metrics.get('wins', 0)}")
     print(f"Losses: {metrics.get('losses', 0)}")
+    print(f"BE: {metrics.get('be', 0)}")
     print(f"Open: {metrics.get('open', 0)}")
     print(f"Win rate: {metrics.get('win_rate', 0):.1%}")
     print(f"Avg win: {metrics.get('avg_win_pips', 0):.1f} pips")
@@ -65,12 +79,24 @@ def run_backtest(
     print("=" * 60)
 
     if trades:
-        print("\nTrade details:")
+        print("\nTrade details (first 20):")
         for t in trades[:20]:
             print(f"  {t.entry_time} | {'LONG' if t.direction == 1 else 'SHORT':5s} | "
                   f"Entry: {t.entry_price:.2f} | SL: {t.sl:.2f} | "
                   f"TP2: {t.tp2:.2f} | {t.outcome:4s} | {t.pnl_pips:+.1f}p | "
                   f"Trigger: {t.trigger} | Lots: {t.lots}")
+
+        wins = [t for t in trades if t.outcome == "WIN"]
+        losses = [t for t in trades if t.outcome == "LOSS"]
+        bes = [t for t in trades if t.outcome == "BE"]
+        if wins:
+            max_win = max(wins, key=lambda t: t.pnl_pips)
+            print(f"\nLargest WIN: {max_win.pnl_pips:+.1f}p ({max_win.trigger}, held {max_win.bars_held} bars)")
+        if losses:
+            max_loss = max(losses, key=lambda t: abs(t.pnl_pips))
+            print(f"Largest LOSS: {max_loss.pnl_pips:+.1f}p ({max_loss.trigger}, held {max_loss.bars_held} bars)")
+        if bes:
+            print(f"BE trades: {len(bes)} (avg {np.mean([t.pnl_pips for t in bes]):+.1f}p)")
 
     return metrics
 
@@ -79,6 +105,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="xauusd/data/raw/xauusd_m15.parquet")
+    parser.add_argument("--data-m5", default=None)
     parser.add_argument("--min-confluence", type=float, default=50.0)
     parser.add_argument("--min-rr", type=float, default=2.0)
     parser.add_argument("--equity", type=float, default=1000.0)
@@ -91,4 +118,5 @@ if __name__ == "__main__":
         min_rr=args.min_rr,
         initial_equity=args.equity,
         risk_per_trade=args.risk,
+        data_m5_path=args.data_m5,
     )

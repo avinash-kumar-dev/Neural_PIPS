@@ -37,10 +37,12 @@ class BacktestConfig:
     initial_equity: float = 100000.0
     min_sl_pips: float = 150.0
     max_sl_pips: float = 500.0
-    trailing_start_r: float = 2.0
-    trailing_step_r: float = 1.0
+    trailing_start_r: float = 3.0
+    trailing_step_r: float = 2.0
     max_bars: int = 500
     breakeven_at_1r: bool = True
+    breakeven_trigger_r: float = 1.5
+    stale_exit_bars: int = 100
 
 
 class BacktestEngine:
@@ -71,7 +73,7 @@ class BacktestEngine:
 
                     mfe_r = trade.max_favorable / sl_distance if sl_distance > 0 else 0
 
-                    if self.config.breakeven_at_1r and not trade.be_hit and mfe_r >= 1.0:
+                    if self.config.breakeven_at_1r and not trade.be_hit and mfe_r >= self.config.breakeven_trigger_r:
                         trade.sl = trade.entry_price + 1.0 * PIP_VALUE
                         trade.be_hit = True
 
@@ -84,7 +86,12 @@ class BacktestEngine:
                         trade.exit_time = bar["datetime"]
                         trade.exit_price = trade.sl
                         trade.pnl_pips = (trade.sl - trade.entry_price) / PIP_VALUE - trade.costs_pips
-                        trade.outcome = "WIN" if trade.sl > trade.entry_price else ("BE" if abs(trade.sl - trade.entry_price) < 1.0 * PIP_VALUE else "LOSS")
+                        if trade.sl > trade.entry_price + 0.5 * PIP_VALUE:
+                            trade.outcome = "WIN"
+                        elif abs(trade.sl - trade.entry_price) < 1.5 * PIP_VALUE:
+                            trade.outcome = "BE"
+                        else:
+                            trade.outcome = "LOSS"
                         equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
                         trades.append(trade)
                         open_trade = None
@@ -96,7 +103,7 @@ class BacktestEngine:
 
                     mfe_r = trade.max_favorable / sl_distance if sl_distance > 0 else 0
 
-                    if self.config.breakeven_at_1r and not trade.be_hit and mfe_r >= 1.0:
+                    if self.config.breakeven_at_1r and not trade.be_hit and mfe_r >= self.config.breakeven_trigger_r:
                         trade.sl = trade.entry_price - 1.0 * PIP_VALUE
                         trade.be_hit = True
 
@@ -109,7 +116,32 @@ class BacktestEngine:
                         trade.exit_time = bar["datetime"]
                         trade.exit_price = trade.sl
                         trade.pnl_pips = (trade.entry_price - trade.sl) / PIP_VALUE - trade.costs_pips
-                        trade.outcome = "WIN" if trade.sl < trade.entry_price else ("BE" if abs(trade.sl - trade.entry_price) < 1.0 * PIP_VALUE else "LOSS")
+                        if trade.sl < trade.entry_price - 0.5 * PIP_VALUE:
+                            trade.outcome = "WIN"
+                        elif abs(trade.sl - trade.entry_price) < 1.5 * PIP_VALUE:
+                            trade.outcome = "BE"
+                        else:
+                            trade.outcome = "LOSS"
+                        equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
+                        trades.append(trade)
+                        open_trade = None
+
+                if open_trade is not None and trade.bars_held >= self.config.stale_exit_bars:
+                    sl_dist = abs(trade.entry_price - trade.sl)
+                    if trade.direction == 1:
+                        current_pnl = bar["close"] - trade.entry_price
+                    else:
+                        current_pnl = trade.entry_price - bar["close"]
+                    if current_pnl < sl_dist * 0.5:
+                        if trade.direction == 1:
+                            trade.exit_time = bar["datetime"]
+                            trade.exit_price = bar["close"]
+                            trade.pnl_pips = (bar["close"] - trade.entry_price) / PIP_VALUE - trade.costs_pips
+                        else:
+                            trade.exit_time = bar["datetime"]
+                            trade.exit_price = bar["close"]
+                            trade.pnl_pips = (trade.entry_price - bar["close"]) / PIP_VALUE - trade.costs_pips
+                        trade.outcome = "WIN" if trade.pnl_pips > 0 else "LOSS"
                         equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
                         trades.append(trade)
                         open_trade = None
