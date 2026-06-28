@@ -79,7 +79,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="xauusd/data/raw/xauusd_m15.parquet")
-    parser.add_argument("--min-confluence", type=float, default=70.0)
+    parser.add_argument("--min-confluence", type=float, default=50.0)
     parser.add_argument("--min-rr", type=float, default=2.0)
     parser.add_argument("--equity", type=float, default=1000.0)
     parser.add_argument("--risk", type=float, default=0.03)

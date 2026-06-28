@@ -4,8 +4,8 @@ import numpy as np
 
 def detect_breaker_blocks(
     df: pd.DataFrame,
-    lookback: int = 20,
-    displacement_mult: float = 1.5,
+    lookback: int = 30,
+    displacement_mult: float = 1.3,
 ) -> pd.DataFrame:
     result = df.copy()
     n = len(result)
@@ -30,56 +30,55 @@ def detect_breaker_blocks(
     breaker_bear_high = np.full(n, np.nan)
     breaker_bear_low = np.full(n, np.nan)
 
-    ob_queue = []
+    pending_bull = []
+    pending_bear = []
 
-    for i in range(lookback + 2, n):
+    for i in range(2, n):
         if np.isnan(atr[i]) or atr[i] == 0:
             continue
 
-        if closes[i] > opens[i] and body[i] > displacement_mult * np.mean(body[max(0, i - 10):i]):
-            if i >= 2:
-                prev_close = closes[i - 1]
-                prev_open = opens[i - 1]
-                if prev_close < prev_open:
-                    ob_queue.append({
-                        "idx": i - 1,
-                        "high": highs[i - 1],
-                        "low": lows[i - 1],
-                        "direction": "bull",
-                        "broken": False,
-                    })
+        avg_body = np.mean(body[max(0, i - 10):i]) if i >= 2 else body[i]
 
-        if closes[i] < opens[i] and body[i] > displacement_mult * np.mean(body[max(0, i - 10):i]):
-            if i >= 2:
-                prev_close = closes[i - 1]
-                prev_open = opens[i - 1]
-                if prev_close > prev_open:
-                    ob_queue.append({
-                        "idx": i - 1,
-                        "high": highs[i - 1],
-                        "low": lows[i - 1],
-                        "direction": "bear",
-                        "broken": False,
-                    })
+        if avg_body > 0 and closes[i] > opens[i] and body[i] > displacement_mult * avg_body:
+            if i >= 2 and closes[i - 1] < opens[i - 1]:
+                pending_bull.append({
+                    "high": highs[i - 1],
+                    "low": lows[i - 1],
+                    "broken": False,
+                    "bar": i,
+                })
 
-        for ob in ob_queue:
-            if ob["broken"]:
-                continue
-            if ob["idx"] < i - 50:
-                ob["broken"] = True
-                continue
+        if avg_body > 0 and closes[i] < opens[i] and body[i] > displacement_mult * avg_body:
+            if i >= 2 and closes[i - 1] > opens[i - 1]:
+                pending_bear.append({
+                    "high": highs[i - 1],
+                    "low": lows[i - 1],
+                    "broken": False,
+                    "bar": i,
+                })
 
-            if ob["direction"] == "bull" and closes[i] < ob["low"]:
-                ob["broken"] = True
-                if lows[i] <= ob["high"] and lows[i] >= ob["low"]:
+        for ob in pending_bull:
+            if not ob["broken"]:
+                if closes[i] < ob["low"]:
+                    ob["broken"] = True
+            elif i - ob["bar"] <= lookback:
+                if lows[i] <= ob["high"] and closes[i] >= ob["low"]:
                     breaker_bull_high[i] = ob["high"]
                     breaker_bull_low[i] = ob["low"]
+                    break
 
-            elif ob["direction"] == "bear" and closes[i] > ob["high"]:
-                ob["broken"] = True
-                if highs[i] >= ob["low"] and highs[i] <= ob["high"]:
+        for ob in pending_bear:
+            if not ob["broken"]:
+                if closes[i] > ob["high"]:
+                    ob["broken"] = True
+            elif i - ob["bar"] <= lookback:
+                if highs[i] >= ob["low"] and closes[i] <= ob["high"]:
                     breaker_bear_high[i] = ob["high"]
                     breaker_bear_low[i] = ob["low"]
+                    break
+
+        pending_bull = [ob for ob in pending_bull if i - ob["bar"] <= lookback]
+        pending_bear = [ob for ob in pending_bear if i - ob["bar"] <= lookback]
 
     result["breaker_bull_high"] = breaker_bull_high
     result["breaker_bull_low"] = breaker_bull_low

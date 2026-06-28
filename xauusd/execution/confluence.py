@@ -35,7 +35,7 @@ def compute_confluence_score(
 
     regime = np.where(
         df.get("regime_trending", False), 1.0,
-        np.where(df.get("regime_ranging", False), 0.5, 0.3)
+        np.where(df.get("regime_ranging", False), 0.7, 0.5)
     )
 
     sweep = np.where(

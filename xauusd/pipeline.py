@@ -23,7 +23,7 @@ from xauusd.execution.filters import compute_session_filter, compute_anti_cluste
 
 def run_full_pipeline(
     df: pd.DataFrame,
-    min_confluence: float = 70.0,
+    min_confluence: float = 55.0,
     min_rr: float = 2.0,
 ) -> pd.DataFrame:
     result = df.copy()
@@ -139,6 +139,28 @@ def run_full_pipeline(
             short_entry[i] = True
             short_sl[i] = sl
             short_trigger[i] = trigger
+
+    closes = result["close"].values
+    min_sl_price = 4.0
+    max_sl_price = 20.0
+
+    for i in range(n):
+        if long_entry[i] and not np.isnan(long_sl[i]):
+            dist = closes[i] - long_sl[i]
+            if dist <= 0:
+                long_entry[i] = False
+            elif dist < min_sl_price:
+                long_sl[i] = closes[i] - min_sl_price
+            elif dist > max_sl_price:
+                long_sl[i] = closes[i] - max_sl_price
+        if short_entry[i] and not np.isnan(short_sl[i]):
+            dist = short_sl[i] - closes[i]
+            if dist <= 0:
+                short_entry[i] = False
+            elif dist < min_sl_price:
+                short_sl[i] = closes[i] + min_sl_price
+            elif dist > max_sl_price:
+                short_sl[i] = closes[i] + max_sl_price
 
     result["long_entry"] = long_entry
     result["short_entry"] = short_entry

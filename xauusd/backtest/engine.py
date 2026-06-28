@@ -3,7 +3,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional
 
-PIP_VALUE = 0.01
+PIP_VALUE = 0.10
 
 
 @dataclass
@@ -33,6 +33,9 @@ class BacktestConfig:
     risk_per_trade: float = 0.03
     min_rr: float = 2.0
     initial_equity: float = 100000.0
+    min_sl_pips: float = 40.0
+    max_sl_pips: float = 220.0
+    breakeven_at_tp1: bool = False
 
 
 class BacktestEngine:
@@ -54,7 +57,7 @@ class BacktestEngine:
                 trade = open_trade
 
                 if trade.direction == 1:
-                    if not trade.be_hit and bar["high"] >= trade.tp1:
+                    if self.config.breakeven_at_tp1 and not trade.be_hit and bar["high"] >= trade.tp1:
                         trade.be_hit = True
                         trade.sl = trade.entry_price
 
@@ -75,7 +78,7 @@ class BacktestEngine:
                         trades.append(trade)
                         open_trade = None
                 else:
-                    if not trade.be_hit and bar["low"] <= trade.tp1:
+                    if self.config.breakeven_at_tp1 and not trade.be_hit and bar["low"] <= trade.tp1:
                         trade.be_hit = True
                         trade.sl = trade.entry_price
 
@@ -116,15 +119,15 @@ class BacktestEngine:
                     entry_price += direction * self.config.slippage_pips * PIP_VALUE
 
                     sl_pips = abs(entry_price - sl) / PIP_VALUE
-                    if sl_pips <= 0:
+                    if sl_pips < self.config.min_sl_pips or sl_pips > self.config.max_sl_pips:
                         continue
 
                     tp2_pips = sl_pips * self.config.min_rr
                     if direction == 1:
-                        tp1 = entry_price + sl_pips * PIP_VALUE
+                        tp1 = entry_price + sl_pips * 1.5 * PIP_VALUE
                         tp2 = entry_price + tp2_pips * PIP_VALUE
                     else:
-                        tp1 = entry_price - sl_pips * PIP_VALUE
+                        tp1 = entry_price - sl_pips * 1.5 * PIP_VALUE
                         tp2 = entry_price - tp2_pips * PIP_VALUE
 
                     costs_pips = self.config.spread_pips + self.config.slippage_pips + (self.config.commission_per_lot / (PIP_VALUE * 100))
