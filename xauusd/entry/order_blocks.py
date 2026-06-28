@@ -1,24 +1,11 @@
 import pandas as pd
 import numpy as np
-from dataclasses import dataclass
-from typing import Optional
-
-
-@dataclass
-class OrderBlock:
-    index: int
-    direction: int  # 1 = bullish OB, -1 = bearish OB
-    high: float
-    low: float
-    displacement_index: int
-    displacement_size: float
 
 
 def detect_order_blocks(
     df: pd.DataFrame,
     atr_period: int = 14,
     displacement_mult: float = 1.5,
-    max_age: int = 20,
 ) -> pd.DataFrame:
     result = df.copy()
     n = len(result)
@@ -30,70 +17,77 @@ def detect_order_blocks(
             abs(result["low"] - result["close"].shift(1)),
         ),
     )
-    atr = pd.Series(tr).rolling(atr_period).mean()
+    atr = pd.Series(tr).rolling(atr_period).mean().values
+    body = (result["close"] - result["open"]).values
+    candle_range = (result["high"] - result["low"]).values
+    opens = result["open"].values
+    highs = result["high"].values
+    lows = result["low"].values
+    closes = result["close"].values
 
-    ob_bullish = np.full(n, np.nan)
-    ob_bearish = np.full(n, np.nan)
+    ob_bull_high = np.full(n, np.nan)
+    ob_bull_low = np.full(n, np.nan)
+    ob_bear_high = np.full(n, np.nan)
+    ob_bear_low = np.full(n, np.nan)
 
     for i in range(atr_period + 2, n):
-        candle_range = result["high"].iloc[i] - result["low"].iloc[i]
-        current_atr = atr.iloc[i]
-        if pd.isna(current_atr) or current_atr == 0:
+        if np.isnan(atr[i]) or atr[i] == 0:
             continue
+        disp = candle_range[i] / atr[i]
+        if disp >= displacement_mult:
+            if body[i] > 0 and i > 0:
+                ob_bull_high[i] = highs[i - 1]
+                ob_bull_low[i] = lows[i - 1]
+            elif body[i] < 0 and i > 0:
+                ob_bear_high[i] = highs[i - 1]
+                ob_bear_low[i] = lows[i - 1]
 
-        displacement = candle_range / current_atr
-
-        if displacement >= displacement_mult:
-            body = result["close"].iloc[i] - result["open"].iloc[i]
-            if body > 0:
-                ob_bullish[i] = result["low"].iloc[i]
-                if i - 1 >= 0:
-                    result.loc[result.index[i], "ob_bullish_high"] = result["high"].iloc[i - 1]
-                    result.loc[result.index[i], "ob_bullish_low"] = result["low"].iloc[i - 1]
-            elif body < 0:
-                ob_bearish[i] = result["high"].iloc[i]
-                if i - 1 >= 0:
-                    result.loc[result.index[i], "ob_bearish_high"] = result["high"].iloc[i - 1]
-                    result.loc[result.index[i], "ob_bearish_low"] = result["low"].iloc[i - 1]
-
-    result["ob_bullish_price"] = ob_bullish
-    result["ob_bearish_price"] = ob_bearish
+    result["ob_bull_high"] = ob_bull_high
+    result["ob_bull_low"] = ob_bull_low
+    result["ob_bear_high"] = ob_bear_high
+    result["ob_bear_low"] = ob_bear_low
     return result
 
 
-def check_ob_retest(
-    df: pd.DataFrame,
-    max_age: int = 20,
-) -> pd.DataFrame:
+def check_ob_retest(df: pd.DataFrame, max_age: int = 20) -> pd.DataFrame:
     result = df.copy()
     n = len(result)
+    highs = result["high"].values
+    lows = result["low"].values
+    closes = result["close"].values
+    opens = result["open"].values
+    ob_bull_h = result["ob_bull_high"].values if "ob_bull_high" in result.columns else np.full(n, np.nan)
+    ob_bull_l = result["ob_bull_low"].values if "ob_bull_low" in result.columns else np.full(n, np.nan)
+    ob_bear_h = result["ob_bear_high"].values if "ob_bear_high" in result.columns else np.full(n, np.nan)
+    ob_bear_l = result["ob_bear_low"].values if "ob_bear_low" in result.columns else np.full(n, np.nan)
 
     ob_bull_signal = np.zeros(n, dtype=bool)
     ob_bear_signal = np.zeros(n, dtype=bool)
     ob_bull_sl = np.full(n, np.nan)
     ob_bear_sl = np.full(n, np.nan)
 
-    active_bull_obs = []
-    active_bear_obs = []
+    bull_queue = []
+    bear_queue = []
 
     for i in range(n):
-        active_bull_obs = [(idx, h, l) for idx, h, l in active_bull_obs if i - idx <= max_age]
-        active_bear_obs = [(idx, h, l) for idx, h, l in active_bear_obs if i - idx <= max_age]
+        while bull_queue and bull_queue[0][0] < i - max_age:
+            bull_queue.pop(0)
+        while bear_queue and bear_queue[0][0] < i - max_age:
+            bear_queue.pop(0)
 
-        if not pd.isna(result.get("ob_bullish_price", pd.Series(dtype=float)).iloc[i] if "ob_bullish_price" in result.columns else np.nan):
-            active_bull_obs.append((i, result["high"].iloc[i], result["low"].iloc[i]))
+        if not np.isnan(ob_bull_h[i]):
+            bull_queue.append((i, ob_bull_h[i], ob_bull_l[i]))
+        if not np.isnan(ob_bear_h[i]):
+            bear_queue.append((i, ob_bear_h[i], ob_bear_l[i]))
 
-        if not pd.isna(result.get("ob_bearish_price", pd.Series(dtype=float)).iloc[i] if "ob_bearish_price" in result.columns else np.nan):
-            active_bear_obs.append((i, result["high"].iloc[i], result["low"].iloc[i]))
-
-        for idx, h, l in active_bull_obs:
-            if l <= result["low"].iloc[i] <= h and result["close"].iloc[i] > result["open"].iloc[i]:
+        for idx, h, l in bull_queue:
+            if l <= lows[i] <= h and closes[i] > opens[i]:
                 ob_bull_signal[i] = True
                 ob_bull_sl[i] = l
                 break
 
-        for idx, h, l in active_bear_obs:
-            if l <= result["high"].iloc[i] <= h and result["close"].iloc[i] < result["open"].iloc[i]:
+        for idx, h, l in bear_queue:
+            if l <= highs[i] <= h and closes[i] < opens[i]:
                 ob_bear_signal[i] = True
                 ob_bear_sl[i] = h
                 break

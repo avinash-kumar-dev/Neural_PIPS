@@ -18,16 +18,19 @@ def detect_swing_points(
     swing_high = np.full(n, np.nan)
     swing_low = np.full(n, np.nan)
 
-    for i in range(lookback, n - lookforward):
-        left_highs = highs[i - lookback : i]
-        right_highs = highs[i + 1 : i + 1 + lookforward]
-        if highs[i] > np.max(left_highs) and highs[i] > np.max(right_highs):
-            swing_high[i] = highs[i]
+    left_max = pd.Series(highs).rolling(lookback, min_periods=lookback).max().shift(1).values
+    right_max = pd.Series(highs).rolling(lookforward, min_periods=lookforward).max().shift(-lookforward).values
 
-        left_lows = lows[i - lookback : i]
-        right_lows = lows[i + 1 : i + 1 + lookforward]
-        if lows[i] < np.min(left_lows) and lows[i] < np.min(right_lows):
-            swing_low[i] = lows[i]
+    left_min = pd.Series(lows).rolling(lookback, min_periods=lookback).min().shift(1).values
+    right_min = pd.Series(lows).rolling(lookforward, min_periods=lookforward).min().shift(-lookforward).values
+
+    for i in range(lookback, n - lookforward):
+        if not np.isnan(left_max[i]) and not np.isnan(right_max[i]):
+            if highs[i] > left_max[i] and highs[i] > right_max[i]:
+                swing_high[i] = highs[i]
+        if not np.isnan(left_min[i]) and not np.isnan(right_min[i]):
+            if lows[i] < left_min[i] and lows[i] < right_min[i]:
+                swing_low[i] = lows[i]
 
     result = df[["datetime", "open", "high", "low", "close", "volume"]].copy()
     result["swing_high"] = swing_high

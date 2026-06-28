@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from typing import Optional
 
 
 def detect_bos(
@@ -13,24 +12,26 @@ def detect_bos(
     bos_bullish = np.zeros(n, dtype=bool)
     bos_bearish = np.zeros(n, dtype=bool)
 
-    last_swing_high = np.nan
-    last_swing_low = np.nan
+    swing_high_vals = result[swing_col_high].values
+    swing_low_vals = result[swing_col_low].values
+    close_vals = result["close"].values
+
+    last_sh = np.nan
+    last_sl = np.nan
 
     for i in range(n):
-        if not np.isnan(result[swing_col_high].iloc[i]):
-            last_swing_high = result[swing_col_high].iloc[i]
-        if not np.isnan(result[swing_col_low].iloc[i]):
-            last_swing_low = result[swing_col_low].iloc[i]
+        if not np.isnan(swing_high_vals[i]):
+            last_sh = swing_high_vals[i]
+        if not np.isnan(swing_low_vals[i]):
+            last_sl = swing_low_vals[i]
 
-        if not np.isnan(last_swing_high):
-            if result["close"].iloc[i] > last_swing_high:
-                bos_bullish[i] = True
-                last_swing_high = np.nan
+        if not np.isnan(last_sh) and close_vals[i] > last_sh:
+            bos_bullish[i] = True
+            last_sh = np.nan
 
-        if not np.isnan(last_swing_low):
-            if result["close"].iloc[i] < last_swing_low:
-                bos_bearish[i] = True
-                last_swing_low = np.nan
+        if not np.isnan(last_sl) and close_vals[i] < last_sl:
+            bos_bearish[i] = True
+            last_sl = np.nan
 
     result["bos_bullish"] = bos_bullish
     result["bos_bearish"] = bos_bearish
