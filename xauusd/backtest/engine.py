@@ -35,11 +35,11 @@ class BacktestConfig:
     risk_per_trade: float = 0.03
     min_rr: float = 3.0
     initial_equity: float = 100000.0
-    min_sl_pips: float = 100.0
+    min_sl_pips: float = 150.0
     max_sl_pips: float = 500.0
     trailing_start_r: float = 2.0
     trailing_step_r: float = 1.0
-    max_bars: int = 300
+    max_bars: int = 500
     breakeven_at_1r: bool = True
 
 
