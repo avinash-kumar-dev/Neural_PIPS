@@ -11,12 +11,13 @@ def compute_asian_range(
 
     if "datetime" in result.columns:
         dt = pd.to_datetime(result["datetime"])
+        hour = dt.dt.hour
     else:
         dt = result.index
         if not isinstance(dt, pd.DatetimeIndex):
             return result
+        hour = dt.hour
 
-    hour = dt.hour
     in_asian = (hour >= asian_start_hour) & (hour < asian_end_hour)
 
     n = len(result)

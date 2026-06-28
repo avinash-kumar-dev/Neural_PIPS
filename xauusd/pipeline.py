@@ -16,7 +16,6 @@ from xauusd.entry.unicorn import detect_unicorn
 from xauusd.entry.rejection_blocks import detect_rejection_blocks
 from xauusd.entry.vwap import compute_vwap
 from xauusd.entry.indicator_triggers import compute_indicator_triggers
-from xauusd.entry.m5_confirmation import compute_m5_confirmation
 from xauusd.confirmation.layer3 import compute_layer3
 from xauusd.execution.confluence import compute_confluence_score
 from xauusd.execution.filters import compute_session_filter, compute_anti_clustering
@@ -29,21 +28,29 @@ def run_full_pipeline(
 ) -> pd.DataFrame:
     result = df.copy()
 
+    print("  Computing regime...")
     result = compute_regime(result)
+    print("  Computing premium/discount + OTE...")
     result = compute_premium_discount(result)
     result = compute_ote_zones(result)
+    print("  Computing layer1 (structure)...")
     result = compute_layer1(result)
+    print("  Computing liquidity pools...")
     result = detect_liquidity_pools(result)
+    print("  Computing asian range...")
     result = compute_asian_range(result)
 
+    print("  Computing OB + FVG...")
     result = detect_order_blocks(result)
     result = check_ob_retest(result)
     result = detect_fvg(result)
     result = check_fvg_retest(result)
+    print("  Computing BPR + Breaker + IFVG + Unicorn...")
     result = detect_bpr(result)
     result = detect_breaker_blocks(result)
     result = detect_ifvg(result)
     result = detect_unicorn(result)
+    print("  Computing rejection blocks + VWAP + indicators...")
     result = detect_rejection_blocks(result)
     result = compute_vwap(result)
     result = compute_indicator_triggers(result)
@@ -58,105 +65,102 @@ def run_full_pipeline(
     long_trigger = np.array([""] * n, dtype=object)
     short_trigger = np.array([""] * n, dtype=object)
 
-    for i in range(n):
-        bias = result["layer1_bias"].iloc[i]
+    bias = result["layer1_bias"].values
 
-        if bias == NO_BIAS:
-            continue
+    long_mask = bias == LONG_ONLY
+    short_mask = bias == SHORT_ONLY
 
+    for i in np.where(long_mask)[0]:
         row = result.iloc[i]
+        trigger = ""
+        sl = np.nan
 
-        if bias == LONG_ONLY:
-            trigger = ""
-            sl = np.nan
+        if row.get("unicorn_bull", False):
+            trigger = "UNICORN"
+            sl = row.get("unicorn_bull_mid", np.nan) - 0.02
+        elif row.get("has_bpr", False) and row.get("bpr_mid", np.nan) > 0:
+            trigger = "BPR"
+            sl = row.get("bpr_low", np.nan) - 0.01
+        elif row.get("ob_bull_signal", False):
+            trigger = "OB"
+            sl = row.get("ob_bull_sl", np.nan)
+        elif row.get("has_breaker_bull", False):
+            trigger = "BREAKER"
+            sl = row.get("breaker_bull_low", np.nan) - 0.01
+        elif row.get("fvg_bull_hold", False):
+            trigger = "FVG_HOLD"
+            sl = row.get("fvg_bull_sl", np.nan)
+        elif row.get("fvg_bull_fill", False):
+            trigger = "FVG_FILL"
+            sl = row.get("fvg_bull_sl", np.nan)
+        elif row.get("has_ifvg_bull", False):
+            trigger = "IFVG"
+            sl = row.get("ifvg_bull_low", np.nan) - 0.01
+        elif row.get("has_rej_bull", False):
+            trigger = "REJECTION"
+            sl = row.get("rej_bull_low", np.nan) - 0.01
 
-            if row.get("unicorn_bull", False):
-                trigger = "UNICORN"
-                sl = row.get("unicorn_bull_mid", np.nan) - 0.02
-            elif row.get("has_bpr", False) and row.get("bpr_mid", np.nan) > 0:
-                trigger = "BPR"
-                sl = row.get("bpr_low", np.nan) - 0.01
-            elif row.get("ob_bull_signal", False):
-                trigger = "OB"
-                sl = row.get("ob_bull_sl", np.nan)
-            elif row.get("has_breaker_bull", False):
-                trigger = "BREAKER"
-                sl = row.get("breaker_bull_low", np.nan) - 0.01
-            elif row.get("fvg_bull_hold", False):
-                trigger = "FVG_HOLD"
-                sl = row.get("fvg_bull_sl", np.nan)
-            elif row.get("fvg_bull_fill", False):
-                trigger = "FVG_FILL"
-                sl = row.get("fvg_bull_sl", np.nan)
-            elif row.get("has_ifvg_bull", False):
-                trigger = "IFVG"
-                sl = row.get("ifvg_bull_low", np.nan) - 0.01
-            elif row.get("has_rej_bull", False):
-                trigger = "REJECTION"
-                sl = row.get("rej_bull_low", np.nan) - 0.01
+        if trigger and not pd.isna(sl):
+            long_entry[i] = True
+            long_sl[i] = sl
+            long_trigger[i] = trigger
 
-            if trigger and not pd.isna(sl):
-                score = compute_confluence_score(result.iloc[[i]], 1).iloc[0]
-                if score >= min_confluence:
-                    entry = row["close"]
-                    sl_pips = abs(entry - sl) / 0.01
-                    tp2 = entry + sl_pips * min_rr * 0.01
+    for i in np.where(short_mask)[0]:
+        row = result.iloc[i]
+        trigger = ""
+        sl = np.nan
 
-                    long_entry[i] = True
-                    long_sl[i] = sl
-                    long_score[i] = score
-                    long_trigger[i] = trigger
+        if row.get("unicorn_bear", False):
+            trigger = "UNICORN"
+            sl = row.get("unicorn_bear_mid", np.nan) + 0.02
+        elif row.get("has_bpr", False) and row.get("bpr_mid", np.nan) > 0:
+            trigger = "BPR"
+            sl = row.get("bpr_high", np.nan) + 0.01
+        elif row.get("ob_bear_signal", False):
+            trigger = "OB"
+            sl = row.get("ob_bear_sl", np.nan)
+        elif row.get("has_breaker_bear", False):
+            trigger = "BREAKER"
+            sl = row.get("breaker_bear_high", np.nan) + 0.01
+        elif row.get("fvg_bear_hold", False):
+            trigger = "FVG_HOLD"
+            sl = row.get("fvg_bear_sl", np.nan)
+        elif row.get("fvg_bear_fill", False):
+            trigger = "FVG_FILL"
+            sl = row.get("fvg_bear_sl", np.nan)
+        elif row.get("has_ifvg_bear", False):
+            trigger = "IFVG"
+            sl = row.get("ifvg_bear_high", np.nan) + 0.01
+        elif row.get("has_rej_bear", False):
+            trigger = "REJECTION"
+            sl = row.get("rej_bear_high", np.nan) + 0.01
 
-        elif bias == SHORT_ONLY:
-            trigger = ""
-            sl = np.nan
-
-            if row.get("unicorn_bear", False):
-                trigger = "UNICORN"
-                sl = row.get("unicorn_bear_mid", np.nan) + 0.02
-            elif row.get("has_bpr", False) and row.get("bpr_mid", np.nan) > 0:
-                trigger = "BPR"
-                sl = row.get("bpr_high", np.nan) + 0.01
-            elif row.get("ob_bear_signal", False):
-                trigger = "OB"
-                sl = row.get("ob_bear_sl", np.nan)
-            elif row.get("has_breaker_bear", False):
-                trigger = "BREAKER"
-                sl = row.get("breaker_bear_high", np.nan) + 0.01
-            elif row.get("fvg_bear_hold", False):
-                trigger = "FVG_HOLD"
-                sl = row.get("fvg_bear_sl", np.nan)
-            elif row.get("fvg_bear_fill", False):
-                trigger = "FVG_FILL"
-                sl = row.get("fvg_bear_sl", np.nan)
-            elif row.get("has_ifvg_bear", False):
-                trigger = "IFVG"
-                sl = row.get("ifvg_bear_high", np.nan) + 0.01
-            elif row.get("has_rej_bear", False):
-                trigger = "REJECTION"
-                sl = row.get("rej_bear_high", np.nan) + 0.01
-
-            if trigger and not pd.isna(sl):
-                score = compute_confluence_score(result.iloc[[i]], -1).iloc[0]
-                if score >= min_confluence:
-                    entry = row["close"]
-                    sl_pips = abs(entry - sl) / 0.01
-                    tp2 = entry - sl_pips * min_rr * 0.01
-
-                    short_entry[i] = True
-                    short_sl[i] = sl
-                    short_score[i] = score
-                    short_trigger[i] = trigger
+        if trigger and not pd.isna(sl):
+            short_entry[i] = True
+            short_sl[i] = sl
+            short_trigger[i] = trigger
 
     result["long_entry"] = long_entry
     result["short_entry"] = short_entry
     result["long_sl"] = long_sl
     result["short_sl"] = short_sl
-    result["long_score"] = long_score
-    result["short_score"] = short_score
     result["long_trigger"] = long_trigger
     result["short_trigger"] = short_trigger
 
+    print("  Computing confluence scores...")
+    long_scores = compute_confluence_score(result, 1)
+    short_scores = compute_confluence_score(result, -1)
+
+    result["long_score"] = long_scores
+    result["short_score"] = short_scores
+
+    long_pass = long_scores >= min_confluence
+    short_pass = short_scores >= min_confluence
+
+    result["long_entry"] = long_entry & long_pass
+    result["short_entry"] = short_entry & short_pass
+
+    print("  Computing layer3 + session + anti-clustering...")
     result = compute_layer3(result)
     result = compute_session_filter(result)
     result = compute_anti_clustering(result)

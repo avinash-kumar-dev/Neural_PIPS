@@ -20,7 +20,7 @@ def compute_session_filter(
         return result
 
     dt = pd.to_datetime(result["datetime"])
-    hour = dt.hour
+    hour = dt.dt.hour
 
     in_any_session = np.zeros(len(result), dtype=bool)
     session_name = np.array([""] * len(result), dtype=object)
