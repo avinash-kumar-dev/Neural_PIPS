@@ -60,3 +60,4 @@ xauusd_scalping_system_architecture.png
 live_signals.json
 catboost_info/
 *.png
+xauusd/data/raw/xauusd_m15_test.parquet
