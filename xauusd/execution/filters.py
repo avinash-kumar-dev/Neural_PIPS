@@ -10,9 +10,9 @@ def compute_session_filter(
 
     if sessions is None:
         sessions = {
-            "london_open": (7, 10),
-            "overlap": (13, 17),
-            "ny_open": (13, 15),
+            "london": (6, 12),
+            "overlap": (12, 17),
+            "ny": (17, 21),
         }
 
     if "datetime" not in result.columns:

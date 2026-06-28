@@ -89,9 +89,9 @@ def compute_confluence_score(
         dt = pd.to_datetime(df["datetime"])
         hour = dt.dt.hour.values
         sess = np.where(
-            ((hour >= 7) & (hour < 10)) | ((hour >= 13) & (hour < 17)), 1.0,
-            np.where((hour >= 10) & (hour < 13), 0.7,
-                     np.where((hour >= 17) & (hour < 20), 0.5, 0.0))
+            ((hour >= 6) & (hour < 12)) | ((hour >= 13) & (hour < 21)), 1.0,
+            np.where((hour >= 12) & (hour < 13), 0.7,
+                     np.where((hour >= 21) & (hour < 23), 0.5, 0.0))
         )
     else:
         sess = np.full(n, 0.5)

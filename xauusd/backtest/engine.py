@@ -23,6 +23,8 @@ class Trade:
     costs_pips: float = 0.0
     lots: float = 0.01
     be_hit: bool = False
+    max_favorable: float = 0.0
+    bars_held: int = 0
 
 
 @dataclass
@@ -31,11 +33,14 @@ class BacktestConfig:
     commission_per_lot: float = 7.0
     slippage_pips: float = 2.0
     risk_per_trade: float = 0.03
-    min_rr: float = 2.0
+    min_rr: float = 3.0
     initial_equity: float = 100000.0
-    min_sl_pips: float = 40.0
-    max_sl_pips: float = 220.0
-    breakeven_at_tp1: bool = False
+    min_sl_pips: float = 100.0
+    max_sl_pips: float = 500.0
+    trailing_start_r: float = 2.0
+    trailing_step_r: float = 1.0
+    max_bars: int = 300
+    breakeven_at_1r: bool = True
 
 
 class BacktestEngine:
@@ -55,49 +60,73 @@ class BacktestEngine:
             if open_trade is not None:
                 bar = df.iloc[i]
                 trade = open_trade
+                trade.bars_held += 1
+
+                sl_distance = abs(trade.entry_price - trade.sl)
 
                 if trade.direction == 1:
-                    if self.config.breakeven_at_tp1 and not trade.be_hit and bar["high"] >= trade.tp1:
+                    current_profit = bar["high"] - trade.entry_price
+                    if current_profit > trade.max_favorable:
+                        trade.max_favorable = current_profit
+
+                    mfe_r = trade.max_favorable / sl_distance if sl_distance > 0 else 0
+
+                    if self.config.breakeven_at_1r and not trade.be_hit and mfe_r >= 1.0:
+                        trade.sl = trade.entry_price + 1.0 * PIP_VALUE
                         trade.be_hit = True
-                        trade.sl = trade.entry_price
+
+                    if self.config.trailing_start_r > 0 and mfe_r >= self.config.trailing_start_r:
+                        new_sl = trade.entry_price + (mfe_r - self.config.trailing_step_r) * sl_distance
+                        if new_sl > trade.sl:
+                            trade.sl = new_sl
 
                     if bar["low"] <= trade.sl:
                         trade.exit_time = bar["datetime"]
                         trade.exit_price = trade.sl
                         trade.pnl_pips = (trade.sl - trade.entry_price) / PIP_VALUE - trade.costs_pips
-                        trade.outcome = "WIN" if trade.sl >= trade.entry_price else "LOSS"
+                        trade.outcome = "WIN" if trade.sl > trade.entry_price else ("BE" if abs(trade.sl - trade.entry_price) < 1.0 * PIP_VALUE else "LOSS")
                         equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
                         trades.append(trade)
                         open_trade = None
-                    elif bar["high"] >= trade.tp2:
-                        trade.exit_time = bar["datetime"]
-                        trade.exit_price = trade.tp2
-                        trade.pnl_pips = (trade.tp2 - trade.entry_price) / PIP_VALUE - trade.costs_pips
-                        trade.outcome = "WIN"
-                        equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
-                        trades.append(trade)
-                        open_trade = None
+
                 else:
-                    if self.config.breakeven_at_tp1 and not trade.be_hit and bar["low"] <= trade.tp1:
+                    current_profit = trade.entry_price - bar["low"]
+                    if current_profit > trade.max_favorable:
+                        trade.max_favorable = current_profit
+
+                    mfe_r = trade.max_favorable / sl_distance if sl_distance > 0 else 0
+
+                    if self.config.breakeven_at_1r and not trade.be_hit and mfe_r >= 1.0:
+                        trade.sl = trade.entry_price - 1.0 * PIP_VALUE
                         trade.be_hit = True
-                        trade.sl = trade.entry_price
+
+                    if self.config.trailing_start_r > 0 and mfe_r >= self.config.trailing_start_r:
+                        new_sl = trade.entry_price - (mfe_r - self.config.trailing_step_r) * sl_distance
+                        if new_sl < trade.sl:
+                            trade.sl = new_sl
 
                     if bar["high"] >= trade.sl:
                         trade.exit_time = bar["datetime"]
                         trade.exit_price = trade.sl
                         trade.pnl_pips = (trade.entry_price - trade.sl) / PIP_VALUE - trade.costs_pips
-                        trade.outcome = "WIN" if trade.sl <= trade.entry_price else "LOSS"
+                        trade.outcome = "WIN" if trade.sl < trade.entry_price else ("BE" if abs(trade.sl - trade.entry_price) < 1.0 * PIP_VALUE else "LOSS")
                         equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
                         trades.append(trade)
                         open_trade = None
-                    elif bar["low"] <= trade.tp2:
+
+                if open_trade is not None and trade.bars_held >= self.config.max_bars:
+                    if trade.direction == 1:
                         trade.exit_time = bar["datetime"]
-                        trade.exit_price = trade.tp2
-                        trade.pnl_pips = (trade.entry_price - trade.tp2) / PIP_VALUE - trade.costs_pips
-                        trade.outcome = "WIN"
-                        equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
-                        trades.append(trade)
-                        open_trade = None
+                        trade.exit_price = bar["close"]
+                        trade.pnl_pips = (bar["close"] - trade.entry_price) / PIP_VALUE - trade.costs_pips
+                    else:
+                        trade.exit_time = bar["datetime"]
+                        trade.exit_price = bar["close"]
+                        trade.pnl_pips = (trade.entry_price - bar["close"]) / PIP_VALUE - trade.costs_pips
+                    trade.outcome = "WIN" if trade.pnl_pips > 0 else "LOSS"
+                    equity += trade.pnl_pips * PIP_VALUE * trade.lots * 100
+                    trades.append(trade)
+                    open_trade = None
 
             if open_trade is None and i < len(signals):
                 row = signals.iloc[i]
@@ -163,10 +192,12 @@ def compute_metrics(trades: list[Trade]) -> dict:
     closed = [t for t in trades if t.outcome != "OPEN"]
     wins = [t for t in closed if t.outcome == "WIN"]
     losses = [t for t in closed if t.outcome == "LOSS"]
+    bes = [t for t in closed if t.outcome == "BE"]
 
     total = len(closed)
     win_count = len(wins)
     loss_count = len(losses)
+    be_count = len(bes)
 
     win_rate = win_count / total if total > 0 else 0
     avg_win = np.mean([t.pnl_pips for t in wins]) if wins else 0
@@ -184,10 +215,13 @@ def compute_metrics(trades: list[Trade]) -> dict:
     drawdowns = running_max - cumulative
     max_drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0
 
+    avg_bars = np.mean([t.bars_held for t in closed]) if closed else 0
+
     return {
         "total_trades": total,
         "wins": win_count,
         "losses": loss_count,
+        "be": be_count,
         "open": len(trades) - total,
         "win_rate": win_rate,
         "avg_win_pips": avg_win,
@@ -198,4 +232,5 @@ def compute_metrics(trades: list[Trade]) -> dict:
         "max_drawdown_pips": max_drawdown,
         "gross_profit_pips": gross_profit,
         "gross_loss_pips": gross_loss,
+        "avg_bars_held": avg_bars,
     }
