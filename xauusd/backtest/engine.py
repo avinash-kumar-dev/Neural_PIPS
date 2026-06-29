@@ -38,10 +38,10 @@ class BacktestConfig:
     min_sl_pips: float = 150.0
     max_sl_pips: float = 500.0
     trailing_start_r: float = 3.0
-    trailing_step_r: float = 2.0
+    trailing_step_r: float = 1.0
     max_bars: int = 500
     breakeven_at_1r: bool = True
-    breakeven_trigger_r: float = 1.5
+    breakeven_trigger_r: float = 2.0
     stale_exit_bars: int = 100
 
 

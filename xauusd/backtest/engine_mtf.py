@@ -35,8 +35,8 @@ class MTFBacktestConfig:
     initial_equity: float = 100000.0
     min_sl_pips: float = 30.0
     max_sl_pips: float = 200.0
-    breakeven_trigger_r: float = 1.5
-    trailing_start_r: float = 2.0
+    breakeven_trigger_r: float = 2.0
+    trailing_start_r: float = 3.0
     trailing_step_r: float = 1.0
     trailing_tp_ratio: float = 2.0
     max_bars: int = 500

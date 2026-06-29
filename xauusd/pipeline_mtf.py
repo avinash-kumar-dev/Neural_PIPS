@@ -24,11 +24,11 @@ def run_mtf_pipeline(
     cascade = result["cascade_bias"].values
     layer1 = result["layer1_bias"].values
 
-    long_mask = (result["long_entry"].values) & (cascade == 1) & (layer1 == 1)
-    short_mask = (result["short_entry"].values) & (cascade == -1) & (layer1 == -1)
+    cascade_agrees_long = (result["long_entry"].values) & (cascade == 1)
+    cascade_agrees_short = (result["short_entry"].values) & (cascade == -1)
 
-    result["long_entry"] = long_mask
-    result["short_entry"] = short_mask
+    result["cascade_agrees_long"] = cascade_agrees_long
+    result["cascade_agrees_short"] = cascade_agrees_short
 
     if df_m5 is not None:
         print("  Aligning M5 confirmation...")
