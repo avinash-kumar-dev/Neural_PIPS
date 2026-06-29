@@ -23,31 +23,61 @@ def compute_htf_bias(
     choch_bullish = np.zeros(n, dtype=bool)
     choch_bearish = np.zeros(n, dtype=bool)
 
-    last_swing_high = np.nan
-    last_swing_low = np.nan
+    swing_highs = []
+    swing_lows = []
+
+    for i in range(swing_lookback, n - swing_lookback):
+        is_swing_high = True
+        for j in range(1, swing_lookback + 1):
+            if highs[i] <= highs[i - j] or highs[i] <= highs[i + j]:
+                is_swing_high = False
+                break
+        if is_swing_high:
+            swing_highs.append((i, highs[i]))
+
+        is_swing_low = True
+        for j in range(1, swing_lookback + 1):
+            if lows[i] >= lows[i - j] or lows[i] >= lows[i + j]:
+                is_swing_low = False
+                break
+        if is_swing_low:
+            swing_lows.append((i, lows[i]))
+
     last_direction = 0
+    sh_idx = 0
+    sl_idx = 0
 
-    for i in range(swing_lookback, n):
-        if not np.isnan(left_max[i]) and highs[i] > left_max[i]:
-            last_swing_high = highs[i]
-        if not np.isnan(left_min[i]) and lows[i] < left_min[i]:
-            last_swing_low = lows[i]
+    for i in range(n):
+        while sh_idx < len(swing_highs) and swing_highs[sh_idx][0] < i:
+            sh_idx += 1
+        while sl_idx < len(swing_lows) and swing_lows[sl_idx][0] < i:
+            sl_idx += 1
 
-        if not np.isnan(last_swing_high) and closes[i] > last_swing_high:
+        last_sh = None
+        for j in range(sh_idx - 1, -1, -1):
+            if swing_highs[j][0] < i:
+                last_sh = swing_highs[j][1]
+                break
+
+        last_sl = None
+        for j in range(sl_idx - 1, -1, -1):
+            if swing_lows[j][0] < i:
+                last_sl = swing_lows[j][1]
+                break
+
+        if last_sh is not None and closes[i] > last_sh:
             if last_direction == -1:
                 choch_bullish[i] = True
             else:
                 bos_bullish[i] = True
             last_direction = 1
-            last_swing_high = np.nan
 
-        if not np.isnan(last_swing_low) and closes[i] < last_swing_low:
+        if last_sl is not None and closes[i] < last_sl:
             if last_direction == 1:
                 choch_bearish[i] = True
             else:
                 bos_bearish[i] = True
             last_direction = -1
-            last_swing_low = np.nan
 
     result["bos_bullish"] = bos_bullish
     result["bos_bearish"] = bos_bearish

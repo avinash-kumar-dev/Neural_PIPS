@@ -62,7 +62,7 @@ class MTFBacktestEngine:
                 trade = open_trade
                 trade.bars_held += 1
 
-                sl_dist = abs(trade.entry_price - trade.sl)
+                initial_sl_dist = abs(trade.entry_price - trade.initial_sl)
 
                 if trade.direction == 1:
                     current_high = bar["high"]
@@ -71,19 +71,16 @@ class MTFBacktestEngine:
                     if current_profit > trade.max_favorable:
                         trade.max_favorable = current_profit
 
-                    mfe_r = trade.max_favorable / sl_dist if sl_dist > 0 else 0
+                    mfe_r = trade.max_favorable / initial_sl_dist if initial_sl_dist > 0 else 0
 
                     if not trade.be_hit and mfe_r >= self.config.breakeven_trigger_r:
                         trade.sl = trade.entry_price + 1.0 * PIP_VALUE
                         trade.be_hit = True
 
                     if self.config.trailing_start_r > 0 and mfe_r >= self.config.trailing_start_r:
-                        new_sl = trade.entry_price + (mfe_r - self.config.trailing_step_r) * sl_dist
+                        new_sl = trade.entry_price + (mfe_r - self.config.trailing_step_r) * initial_sl_dist
                         if new_sl > trade.sl:
                             trade.sl = new_sl
-
-                    current_sl_dist = abs(trade.entry_price - trade.sl)
-                    trade.tp = trade.entry_price + current_sl_dist * self.config.trailing_tp_ratio
 
                     if current_low <= trade.sl:
                         trade.exit_time = bar["datetime"]
@@ -115,19 +112,16 @@ class MTFBacktestEngine:
                     if current_profit > trade.max_favorable:
                         trade.max_favorable = current_profit
 
-                    mfe_r = trade.max_favorable / sl_dist if sl_dist > 0 else 0
+                    mfe_r = trade.max_favorable / initial_sl_dist if initial_sl_dist > 0 else 0
 
                     if not trade.be_hit and mfe_r >= self.config.breakeven_trigger_r:
                         trade.sl = trade.entry_price - 1.0 * PIP_VALUE
                         trade.be_hit = True
 
                     if self.config.trailing_start_r > 0 and mfe_r >= self.config.trailing_start_r:
-                        new_sl = trade.entry_price - (mfe_r - self.config.trailing_step_r) * sl_dist
+                        new_sl = trade.entry_price - (mfe_r - self.config.trailing_step_r) * initial_sl_dist
                         if new_sl < trade.sl:
                             trade.sl = new_sl
-
-                    current_sl_dist = abs(trade.entry_price - trade.sl)
-                    trade.tp = trade.entry_price - current_sl_dist * self.config.trailing_tp_ratio
 
                     if current_high >= trade.sl:
                         trade.exit_time = bar["datetime"]
@@ -157,7 +151,7 @@ class MTFBacktestEngine:
                         current_pnl = bar["close"] - trade.entry_price
                     else:
                         current_pnl = trade.entry_price - bar["close"]
-                    if current_pnl < sl_dist * 0.5:
+                    if current_pnl < initial_sl_dist * 0.5:
                         if trade.direction == 1:
                             trade.exit_time = bar["datetime"]
                             trade.exit_price = bar["close"]
