@@ -45,8 +45,8 @@ def run_backtest(
         df_m1 = pd.read_parquet(m1_path)
         print(f"  Loaded {len(df_m1)} M1 bars")
 
-    for df, name in [(df_m15, "M15"), (df_h4, "H4"), (df_h1, "H1")]:
-        if "datetime" not in df.columns:
+    for df, name in [(df_m15, "M15"), (df_h4, "H4"), (df_h1, "H1"), (df_m5, "M5"), (df_m1, "M1")]:
+        if df is not None and "datetime" not in df.columns:
             if "time" in df.columns:
                 df["datetime"] = pd.to_datetime(df["time"], unit="s")
             elif isinstance(df.index, pd.DatetimeIndex):

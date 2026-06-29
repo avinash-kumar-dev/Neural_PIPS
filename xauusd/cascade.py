@@ -15,9 +15,6 @@ def compute_htf_bias(
     lows = result["low"].values
     closes = result["close"].values
 
-    left_max = pd.Series(highs).rolling(swing_lookback, min_periods=swing_lookback).max().shift(1).values
-    left_min = pd.Series(lows).rolling(swing_lookback, min_periods=swing_lookback).min().shift(1).values
-
     bos_bullish = np.zeros(n, dtype=bool)
     bos_bearish = np.zeros(n, dtype=bool)
     choch_bullish = np.zeros(n, dtype=bool)

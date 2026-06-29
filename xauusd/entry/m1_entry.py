@@ -4,7 +4,7 @@ import numpy as np
 
 def detect_m1_mss(
     df: pd.DataFrame,
-    swing_lookback: int = 3,
+    swing_lookback: int = 5,
 ) -> pd.DataFrame:
     result = df.copy()
     n = len(result)
@@ -18,6 +18,8 @@ def detect_m1_mss(
 
     mss_bullish = np.zeros(n, dtype=bool)
     mss_bearish = np.zeros(n, dtype=bool)
+    swing_low_for_sl = np.full(n, np.nan)
+    swing_high_for_sl = np.full(n, np.nan)
 
     last_swing_high = np.nan
     last_swing_low = np.nan
@@ -30,14 +32,18 @@ def detect_m1_mss(
 
         if not np.isnan(last_swing_low) and closes[i] > last_swing_low:
             mss_bullish[i] = True
+            swing_low_for_sl[i] = last_swing_low
             last_swing_low = np.nan
 
         if not np.isnan(last_swing_high) and closes[i] < last_swing_high:
             mss_bearish[i] = True
+            swing_high_for_sl[i] = last_swing_high
             last_swing_high = np.nan
 
     result["m1_mss_bullish"] = mss_bullish
     result["m1_mss_bearish"] = mss_bearish
+    result["m1_swing_low_sl"] = swing_low_for_sl
+    result["m1_swing_high_sl"] = swing_high_for_sl
     return result
 
 
@@ -133,22 +139,44 @@ def compute_m1_entry(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
     result = df.copy()
-    result = detect_m1_mss(result, swing_lookback=3)
+    result = detect_m1_mss(result, swing_lookback=5)
     result = detect_m1_rejection(result, min_wick_ratio=2.0)
     result = detect_m1_engulfing(result)
     result = detect_m1_displacement(result)
 
-    result["m1_bull_entry"] = (
-        result["m1_mss_bullish"] |
-        result["m1_bull_rejection"] |
-        result["m1_bull_engulfing"] |
-        result["m1_bull_displacement"]
+    bull_score = (
+        result["m1_mss_bullish"].astype(int) +
+        result["m1_bull_rejection"].astype(int) +
+        result["m1_bull_engulfing"].astype(int) +
+        result["m1_bull_displacement"].astype(int)
     )
-    result["m1_bear_entry"] = (
-        result["m1_mss_bearish"] |
-        result["m1_bear_rejection"] |
-        result["m1_bear_engulfing"] |
-        result["m1_bear_displacement"]
+    bear_score = (
+        result["m1_mss_bearish"].astype(int) +
+        result["m1_bear_rejection"].astype(int) +
+        result["m1_bear_engulfing"].astype(int) +
+        result["m1_bear_displacement"].astype(int)
     )
+
+    result["m1_bull_entry"] = bull_score >= 2
+    result["m1_bear_entry"] = bear_score >= 2
+
+    n = len(result)
+    m1_bull_sl = np.full(n, np.nan)
+    m1_bear_sl = np.full(n, np.nan)
+
+    lows = result["low"].values
+    highs = result["high"].values
+
+    for i in range(5, n):
+        if result["m1_bull_entry"].iloc[i]:
+            lookback = lows[max(0, i - 10):i]
+            m1_bull_sl[i] = np.nanmin(lookback) - 0.50
+
+        if result["m1_bear_entry"].iloc[i]:
+            lookback = highs[max(0, i - 10):i]
+            m1_bear_sl[i] = np.nanmax(lookback) + 0.50
+
+    result["m1_bull_sl"] = m1_bull_sl
+    result["m1_bear_sl"] = m1_bear_sl
 
     return result

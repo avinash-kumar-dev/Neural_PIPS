@@ -11,8 +11,8 @@ def compute_session_filter(
     if sessions is None:
         sessions = {
             "london": (6, 12),
-            "overlap": (12, 17),
-            "ny": (17, 21),
+            "overlap": (13, 16),
+            "ny": (16, 21),
         }
 
     if "datetime" not in result.columns:

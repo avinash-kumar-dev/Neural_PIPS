@@ -7,7 +7,7 @@ from xauusd.entry.m5_confirmation import compute_m5_confirmation
 def align_m5_to_m15(
     df_m15: pd.DataFrame,
     df_m5: pd.DataFrame,
-    lookahead_bars: int = 3,
+    lookahead_bars: int = 0,
 ) -> pd.DataFrame:
     result = df_m15.copy()
 
