@@ -36,7 +36,10 @@ def compute_basic_indicators(df: pd.DataFrame, atr_period: int = 14) -> pd.DataF
         df["kc_mid"] = kc.iloc[:, 1]
         df["kc_lower"] = kc.iloc[:, 0]
 
-    df["vwap"] = ta.vwap(df["high"], df["low"], df["close"], df["volume"])
+    tmp = df.set_index("datetime")
+    tmp.index = pd.to_datetime(tmp.index)
+    tmp = tmp.sort_index()
+    df["vwap"] = ta.vwap(tmp["high"], tmp["low"], tmp["close"], tmp["volume"], anchor="D")
 
     st = ta.supertrend(df["high"], df["low"], df["close"], length=10, multiplier=3.0)
     if st is not None:
