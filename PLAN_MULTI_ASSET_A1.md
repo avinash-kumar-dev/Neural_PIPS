@@ -146,7 +146,26 @@ Telegram alerts per instrument:
 5. SL beyond the divergence point
 6. TP at next S/R level
 
-### Setup 5: Ichimoku + Supertrend MTF (For Strong Trends)
+### Setup 5: ORB + Price Action Confirmation (Opening Range Breakout)
+**Instruments**: US100, US30, EUR/USD
+**Timeframes**: M5 entry, M15 bias
+**Win Rate Target**: 60%+
+**R:R Target**: 2:1+
+
+**Rules**:
+1. Define opening range: First 15/30/60 min of session (configurable)
+2. Mark OR high and OR low
+3. Wait for breakout above OR high (long) or below OR low (short)
+4. Confirmation: Volume spike + bullish/bearish engulfing OR RSI confirmation
+5. Entry on breakout candle close
+6. SL at opposite side of OR (or midpoint for tighter risk)
+7. TP at 1.5x OR range, 2x OR range, or next S/R level
+8. No entry if breakout happens in first 5 min (false break)
+9. No entry if OR range is too small (< min ATR * 0.3) or too large (> ATR * 2)
+
+**Key Insight**: ORB works best on indices (US100, US30) during US market open. The opening range captures institutional positioning. Combining with volume + candle confirmation filters false breakouts.
+
+### Setup 6: Ichimoku + Supertrend MTF (For Strong Trends)
 **Instruments**: USD/JPY, US100, GBP/USD
 **Timeframes**: Daily bias → H4/H1 entry
 **Win Rate Target**: 65%+

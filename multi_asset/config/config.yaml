@@ -1,0 +1,104 @@
+instruments:
+  US30:
+    mt5_symbol: "US30"
+    pip_value: 1.0
+    pip_name: "point"
+    spread_max: 3.0
+    sessions:
+      primary: "09:30-16:00"   # US Eastern
+      best: "09:30-11:00"      # Opening drive
+    risk_pct: 1.0
+    min_sl_pips: 50
+    max_sl_pips: 300
+    atr_period: 14
+    setups: ["orb", "vwap_reclaim", "range_reversion"]
+
+  US100:
+    mt5_symbol: "USTECH100M"
+    pip_value: 1.0
+    pip_name: "point"
+    spread_max: 3.0
+    sessions:
+      primary: "09:30-16:00"
+      best: "09:30-11:00"
+    risk_pct: 1.0
+    min_sl_pips: 30
+    max_sl_pips: 250
+    atr_period: 14
+    setups: ["orb", "vwap_reclaim", "bb_squeeze"]
+
+  EURUSD:
+    mt5_symbol: "EURUSD"
+    pip_value: 0.0001
+    pip_name: "pip"
+    spread_max: 1.0
+    sessions:
+      primary: "06:00-21:00"   # UTC
+      best: "13:00-16:00"      # London-NY overlap
+    risk_pct: 2.0
+    min_sl_pips: 20
+    max_sl_pips: 80
+    atr_period: 14
+    setups: ["liquidity_sweep", "mean_reversion", "orb"]
+
+  GBPUSD:
+    mt5_symbol: "GBPUSD"
+    pip_value: 0.0001
+    pip_name: "pip"
+    spread_max: 2.0
+    sessions:
+      primary: "06:00-21:00"
+      best: "08:00-11:00"      # London open
+    risk_pct: 1.5
+    min_sl_pips: 25
+    max_sl_pips: 100
+    atr_period: 14
+    setups: ["liquidity_sweep", "trend_following", "momentum"]
+
+  USDJPY:
+    mt5_symbol: "USDJPY"
+    pip_value: 0.01
+    pip_name: "pip"
+    spread_max: 1.5
+    sessions:
+      primary: "00:00-21:00"   # Tokyo + London + NY
+      best: "00:00-02:00"      # Tokyo open
+    risk_pct: 1.5
+    min_sl_pips: 20
+    max_sl_pips: 80
+    atr_period: 14
+    setups: ["trend_following", "ichimoku_supertrend", "orb"]
+
+  XAUUSD:
+    mt5_symbol: "XAUUSD"
+    pip_value: 0.10
+    pip_name: "pip"
+    spread_max: 0.5
+    sessions:
+      primary: "06:00-21:00"
+      best: "13:00-16:00"
+    risk_pct: 1.0
+    min_sl_pips: 150
+    max_sl_pips: 500
+    atr_period: 14
+    setups: ["liquidity_sweep", "trend_following"]
+
+general:
+  max_concurrent_trades: 3
+  max_portfolio_heat_pct: 5.0
+  daily_loss_limit_pct: 3.0
+  default_rr: 2.0
+  min_rr: 2.0
+  max_bars: 300
+  stale_exit_bars: 80
+  breakeven_trigger_r: 2.0
+  trailing_start_r: 3.0
+  trailing_step_r: 1.0
+
+data:
+  timeframes:
+    htf: "H1"
+    bias: "M15"
+    entry: "M5"
+  max_bars: 100000
+  chunk_size: 50000
