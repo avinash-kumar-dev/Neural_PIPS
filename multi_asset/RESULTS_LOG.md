@@ -433,3 +433,185 @@
 | USDJPY | 2641 | 33% | -1605.0 |
 
 ---
+
+
+---
+
+# Iteration 2: Supertrend + Session + Anti-Cluster + RR Filter
+
+
+## US30 M5 (Iteration 2)
+> Config: ST+BOS+Session 13-21+AntiCluster 3/day+RR>=2
+
+| Metric | Value |
+|--------|-------|
+| Total Trades | 525 |
+| Win Rate | 39.0% |
+| Total PnL | +11089.4 pips |
+| Profit Factor | 1.46 |
+| R:R | 2.15 |
+| Max Drawdown | 1750.4 pips |
+| Avg Win | 171.2 pips |
+| Avg Loss | 79.5 pips |
+
+### Per Instrument
+
+| Instrument | Trades | WR | PnL |
+|------------|--------|-----|-----|
+| US30 | 525 | 39% | +11089.4 |
+
+---
+
+## US100 M5 (Iteration 2)
+> Config: ST+BOS+Session 13-21+AntiCluster 3/day+RR>=2
+
+| Metric | Value |
+|--------|-------|
+| Total Trades | 523 |
+| Win Rate | 38.2% |
+| Total PnL | +5293.1 pips |
+| Profit Factor | 1.28 |
+| R:R | 2.04 |
+| Max Drawdown | 2861.6 pips |
+| Avg Win | 120.6 pips |
+| Avg Loss | 59.2 pips |
+
+### Per Instrument
+
+| Instrument | Trades | WR | PnL |
+|------------|--------|-----|-----|
+| US100 | 523 | 38% | +5293.1 |
+
+---
+
+## EURUSD M5 (Iteration 2)
+> Config: ST+BOS+Session 6-21+AntiCluster 3/day+RR>=2
+
+| Metric | Value |
+|--------|-------|
+| Total Trades | 367 |
+| Win Rate | 34.1% |
+| Total PnL | -217.4 pips |
+| Profit Factor | 0.91 |
+| R:R | 1.72 |
+| Max Drawdown | 332.3 pips |
+| Avg Win | 16.8 pips |
+| Avg Loss | 9.8 pips |
+
+### Per Instrument
+
+| Instrument | Trades | WR | PnL |
+|------------|--------|-----|-----|
+| EURUSD | 367 | 34% | -217.4 |
+
+---
+
+## GBPUSD M5 (Iteration 2)
+> Config: ST+BOS+Session 6-21+AntiCluster 3/day+RR>=2
+
+| Metric | Value |
+|--------|-------|
+| Total Trades | 442 |
+| Win Rate | 30.3% |
+| Total PnL | -866.8 pips |
+| Profit Factor | 0.74 |
+| R:R | 1.68 |
+| Max Drawdown | 909.1 pips |
+| Avg Win | 18.6 pips |
+| Avg Loss | 11.1 pips |
+
+### Per Instrument
+
+| Instrument | Trades | WR | PnL |
+|------------|--------|-----|-----|
+| GBPUSD | 442 | 30% | -866.8 |
+
+---
+
+
+---
+
+# Iteration 2: Session + AntiCluster + RR Filter
+
+
+
+---
+
+# Iteration 2: Session + AntiCluster + RR Filter
+
+
+### Config: max_day=3, gap=6
+
+| Inst | Trades | WR | PnL | PF | R:R |
+|------|--------|-----|-----|-----|-----|
+| US30 | 525 | 39% | +11089.4 | 1.46 | 2.15 |
+| US100 | 523 | 38% | +5293.1 | 1.28 | 2.04 |
+| EURUSD | 367 | 34% | -217.4 | 0.91 | 1.72 |
+| GBPUSD | 442 | 30% | -866.8 | 0.74 | 1.68 |
+| USDJPY | 474 | 34% | +90.5 | 1.02 | 1.93 |
+| **TOTAL** | | | **+15388.8** | **1.08** | |
+
+
+
+---
+
+# Iteration 2: Session + AntiCluster + RR Filter
+
+
+### Config: max_day=3, gap=6
+
+| Inst | Trades | WR | PnL | PF | R:R |
+|------|--------|-----|-----|-----|-----|
+| US30 | 526 | 39% | +11198.3 | 1.47 | 2.15 |
+| US100 | 523 | 38% | +5293.1 | 1.28 | 2.04 |
+| EURUSD | 367 | 34% | -217.4 | 0.91 | 1.72 |
+| GBPUSD | 442 | 30% | -866.8 | 0.74 | 1.68 |
+| USDJPY | 474 | 34% | +90.5 | 1.02 | 1.93 |
+| **TOTAL** | | | **+15497.7** | **1.08** | |
+
+
+
+---
+
+# Iteration 2: Vectorized Signals + Filters
+
+
+## V2 Total (V1: 3/day, gap6, adx20)
+> V1: 3/day, gap6, adx20
+
+| Trades | WR | PnL | PF | R:R | MaxDD |
+|--------|-----|-----|-----|-----|-------|
+| 2332 | 35% | +15497.7 | 1.08 | 0.00 | 0.0 |
+
+| Inst | Trades | WR | PnL |
+|------|--------|-----|-----|
+| US30 | 526 | 39% | +11198.3 |
+| US100 | 523 | 38% | +5293.1 |
+| EURUSD | 367 | 34% | -217.4 |
+| GBPUSD | 442 | 30% | -866.8 |
+| USDJPY | 474 | 34% | +90.5 |
+
+---
+
+
+---
+
+# Iteration 2: Vectorized Signals + Filters
+
+
+## V2 Total (V1: 3/day, gap6, adx20)
+> V1: 3/day, gap6, adx20
+
+| Trades | WR | PnL | PF | R:R | MaxDD |
+|--------|-----|-----|-----|-----|-------|
+| 2332 | 35% | +15497.7 | 1.08 | 0.00 | 0.0 |
+
+| Inst | Trades | WR | PnL |
+|------|--------|-----|-----|
+| US30 | 526 | 39% | +11198.3 |
+| US100 | 523 | 38% | +5293.1 |
+| EURUSD | 367 | 34% | -217.4 |
+| GBPUSD | 442 | 30% | -866.8 |
+| USDJPY | 474 | 34% | +90.5 |
+
+---

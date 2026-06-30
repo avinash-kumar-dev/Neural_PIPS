@@ -1,82 +1,79 @@
-import pandas as pd
+from __future__ import annotations
+
 import numpy as np
-from dataclasses import dataclass
+import pandas as pd
+from dataclasses import dataclass, field
 from typing import Optional
 
 
 @dataclass
 class Trade:
-    instrument: str = ""
-    direction: int = 0
-    entry_time: pd.Timestamp = None
-    entry_price: float = 0.0
-    sl: float = 0.0
-    tp1: float = 0.0
-    tp2: float = 0.0
-    exit_time: pd.Timestamp = None
+    instrument: str
+    direction: int  # 1=LONG, -1=SHORT
+    entry_time: str
+    entry_price: float
+    sl: float
+    tp1: float
+    tp2: float
+    setup: str
+    costs_pips: float
+    rr: float
+    pip_value: float
+    exit_time: str = ""
     exit_price: float = 0.0
     pnl_pips: float = 0.0
     outcome: str = "OPEN"
-    setup: str = ""
-    rr: float = 0.0
     bars_held: int = 0
-    costs_pips: float = 0.0
-    pip_value: float = 0.0001
 
 
 @dataclass
 class EngineConfig:
-    spread_pips: float = 0.5
+    spread_pips: float = 1.0
     slippage_pips: float = 0.5
     commission_per_lot: float = 7.0
-    risk_per_trade_pct: float = 1.0
-    initial_equity: float = 10000.0
     min_rr: float = 2.0
+    initial_equity: float = 100000.0
+    max_concurrent: int = 10
     breakeven_trigger_r: float = 2.0
     trailing_start_r: float = 3.0
     trailing_step_r: float = 1.0
     max_bars: int = 300
     stale_exit_bars: int = 80
-    max_concurrent: int = 3
 
 
 class MultiAssetEngine:
-    def __init__(self, config: EngineConfig = None):
+    def __init__(self, config: EngineConfig | None = None):
         self.config = config or EngineConfig()
 
     def run(self, instruments_data: dict, signals: dict) -> list[Trade]:
         all_trades = []
-        equity = self.config.initial_equity
-
+        active_trades = []
         max_idx = max(len(df) for df in instruments_data.values())
 
         for i in range(max_idx):
-            active = [t for t in all_trades if t.outcome == "OPEN"]
+            closed_indices = []
+            for j, trade in enumerate(active_trades):
+                name = trade.instrument
+                if name not in instruments_data or i >= len(instruments_data[name]):
+                    continue
+                bar = instruments_data[name].iloc[i]
+                self._manage_trade(trade, bar)
+                if trade.outcome != "OPEN":
+                    closed_indices.append(j)
+
+            for j in reversed(closed_indices):
+                active_trades.pop(j)
+
+            if len(active_trades) >= self.config.max_concurrent:
+                continue
 
             for name, df in instruments_data.items():
-                if i >= len(df):
+                if i >= len(df) or name not in signals:
                     continue
+                sig = signals[name].iloc[i]
                 bar = df.iloc[i]
 
-                for trade in [t for t in active if t.instrument == name]:
-                    self._manage_trade(trade, bar, equity)
-
-                if name not in signals:
-                    continue
-                sig_df = signals[name]
-                if i >= len(sig_df):
-                    continue
-                sig = sig_df.iloc[i]
-
-                active_count = sum(1 for t in all_trades if t.outcome == "OPEN")
-                if active_count >= self.config.max_concurrent:
-                    continue
-
-                pip_val = 0.0001
-                if "pip_value" in sig.index:
-                    pip_val = sig["pip_value"]
-                elif name in instruments_data:
-                    pip_val = 0.01 if "US" in name else 0.0001
+                pip_val = sig.get("pip_value", 0.0001)
 
                 for direction in [1, -1]:
                     entry_key = "entry_long" if direction == 1 else "entry_short"
@@ -102,27 +99,28 @@ class MultiAssetEngine:
                     tp2 = entry_price + direction * sl_dist * 3.0
 
                     trade = Trade(
-                        instrument=name,
-                        direction=direction,
+                        instrument=name, direction=direction,
                         entry_time=bar["datetime"],
                         entry_price=entry_price + direction * self.config.slippage_pips * pip_val,
-                        sl=sl,
-                        tp1=tp1,
-                        tp2=tp2,
+                        sl=sl, tp1=tp1, tp2=tp2,
                         setup=sig.get(setup_key, "unknown"),
-                        costs_pips=costs,
-                        rr=2.0,
-                        pip_value=pip_val,
+                        costs_pips=costs, rr=2.0, pip_value=pip_val,
                     )
                     all_trades.append(trade)
+                    active_trades.append(trade)
 
-        for t in all_trades:
+                    if len(active_trades) >= self.config.max_concurrent:
+                        break
+                if len(active_trades) >= self.config.max_concurrent:
+                    break
+
+        for t in active_trades:
             if t.outcome == "OPEN":
                 t.outcome = "OPEN"
 
         return all_trades
 
-    def _manage_trade(self, trade: Trade, bar: pd.Series, equity: float):
+    def _manage_trade(self, trade: Trade, bar: pd.Series):
         trade.bars_held += 1
         sl_dist = abs(trade.entry_price - trade.sl)
         if sl_dist == 0:
@@ -133,34 +131,27 @@ class MultiAssetEngine:
         if trade.direction == 1:
             mfe = bar["high"] - trade.entry_price
             mfe_r = mfe / sl_dist
-
             if mfe_r >= self.config.breakeven_trigger_r:
                 new_sl = trade.entry_price + pip_val
                 if new_sl > trade.sl:
                     trade.sl = new_sl
-
             if mfe_r >= self.config.trailing_start_r:
                 new_sl = trade.entry_price + (mfe_r - self.config.trailing_step_r) * sl_dist
                 if new_sl > trade.sl:
                     trade.sl = new_sl
-
             if bar["low"] <= trade.sl:
                 self._close_trade(trade, bar)
-
         else:
             mfe = trade.entry_price - bar["low"]
             mfe_r = mfe / sl_dist
-
             if mfe_r >= self.config.breakeven_trigger_r:
                 new_sl = trade.entry_price - pip_val
                 if new_sl < trade.sl:
                     trade.sl = new_sl
-
             if mfe_r >= self.config.trailing_start_r:
                 new_sl = trade.entry_price - (mfe_r - self.config.trailing_step_r) * sl_dist
                 if new_sl < trade.sl:
                     trade.sl = new_sl
-
             if bar["high"] >= trade.sl:
                 self._close_trade(trade, bar)
 
