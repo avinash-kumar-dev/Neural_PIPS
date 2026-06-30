@@ -684,3 +684,49 @@
 | XAUUSD | 2350 | 36% | +61870.5 |
 
 ---
+
+
+---
+
+# Walk-Forward Validation — Combined System
+
+> Config: train=6mo, test=1mo
+
+| Window | Trades | PnL |
+|--------|--------|-----|
+| 1 | 522 | -3880.0 |
+| **TOTAL** | **522** | **-3880.0** |
+
+- Profitable windows: 0/1 (0%)
+- Pips/month: -3880.0
+- Target: 4,000 pips/month
+- TARGET NOT MET
+
+
+---
+
+# Walk-Forward Validation — Combined System
+
+> Config: train=6mo, test=1mo
+
+| Window | Trades | PnL |
+|--------|--------|-----|
+| 1 | 142 | +1559.4 |
+| 2 | 142 | -1727.5 |
+| 3 | 124 | +4707.6 |
+| 4 | 145 | -245.5 |
+| 5 | 149 | -477.2 |
+| 6 | 134 | +2782.2 |
+| 7 | 138 | +4416.1 |
+| 8 | 138 | +1213.8 |
+| 9 | 143 | +1229.8 |
+| 10 | 142 | +2880.4 |
+| 11 | 136 | -1617.9 |
+| 12 | 146 | -504.3 |
+| 13 | 138 | -3072.2 |
+| **TOTAL** | **1817** | **+11144.7** |
+
+- Profitable windows: 7/13 (54%)
+- Pips/month: +857.3
+- Target: 4,000 pips/month
+- TARGET NOT MET
