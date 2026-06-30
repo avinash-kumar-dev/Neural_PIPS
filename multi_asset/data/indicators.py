@@ -78,11 +78,14 @@ def detect_swing_points(df: pd.DataFrame, lookback: int = 5) -> pd.DataFrame:
     swing_low = np.zeros(n, dtype=bool)
 
     for i in range(lookback, n - lookback):
-        if all(highs[i] >= highs[i - j] for j in range(1, lookback + 1)) and \
-           all(highs[i] >= highs[i + j] for j in range(1, lookback + 1)):
+        left_h = highs[i - lookback:i]
+        right_h = highs[i + 1:i + lookback + 1]
+        if highs[i] >= np.max(left_h) and highs[i] >= np.max(right_h):
             swing_high[i] = True
-        if all(lows[i] <= lows[i - j] for j in range(1, lookback + 1)) and \
-           all(lows[i] <= lows[i + j] for j in range(1, lookback + 1)):
+
+        left_l = lows[i - lookback:i]
+        right_l = lows[i + 1:i + lookback + 1]
+        if lows[i] <= np.min(left_l) and lows[i] <= np.min(right_l):
             swing_low[i] = True
 
     df["swing_high"] = swing_high
@@ -95,22 +98,26 @@ def detect_swing_points(df: pd.DataFrame, lookback: int = 5) -> pd.DataFrame:
 
 def detect_bos(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
+    close = df["close"].values
+    sh = df["swing_high_price"].values
+    sl = df["swing_low_price"].values
     n = len(df)
+
     bos_bull = np.zeros(n, dtype=bool)
     bos_bear = np.zeros(n, dtype=bool)
 
-    last_sh = None
-    last_sl = None
+    last_sh = np.nan
+    last_sl = np.nan
 
     for i in range(n):
-        if df["swing_high"].iloc[i]:
-            last_sh = df["high"].iloc[i]
-        if df["swing_low"].iloc[i]:
-            last_sl = df["low"].iloc[i]
+        if not np.isnan(sh[i]):
+            last_sh = sh[i]
+        if not np.isnan(sl[i]):
+            last_sl = sl[i]
 
-        if last_sh is not None and df["close"].iloc[i] > last_sh:
+        if not np.isnan(last_sh) and close[i] > last_sh:
             bos_bull[i] = True
-        if last_sl is not None and df["close"].iloc[i] < last_sl:
+        if not np.isnan(last_sl) and close[i] < last_sl:
             bos_bear[i] = True
 
     df["bos_bull"] = bos_bull
