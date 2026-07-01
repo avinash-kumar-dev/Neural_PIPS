@@ -742,3 +742,22 @@
 | E: BB + ADX>25 + RSI tight | 374 | 29% | -998.2 | 0.65 | 4/13 | -629.1 |
 
 ---
+
+
+---
+
+# Step 7: Combined Walk-Forward — Best Per Instrument
+
+| Instrument | Variant | WF Windows | Profitable | WF PnL |
+|------------|---------|------------|------------|--------|
+| US30 | A: Baseline | 13 | 8/13 | +9720.8 |
+| US100 | A: Baseline | 13 | 6/13 | +2616.8 |
+| XAUUSD | B: + BB Expanding | 13 | 12/13 | +27918.3 |
+| GBPUSD | D: + Volume Spike | 13 | 6/13 | +284.8 |
+| USDJPY | A: Baseline | 13 | 6/13 | +758.9 |
+
+**Combined: +41299.6 pips over 13 months = +3176.9 pips/month**
+
+Profitable windows: 10/13 (77%)
+
+---
