@@ -730,3 +730,15 @@
 - Pips/month: +857.3
 - Target: 4,000 pips/month
 - TARGET NOT MET
+
+## EURUSD Variants
+
+| Variant | Trades | WR | PnL | PF | WF Windows | WF PnL |
+|---------|--------|-----|-----|-----|------------|--------|
+| A: Baseline | 655 | 33% | -635.2 | 0.86 | 6/13 | -309.0 |
+| B: + BB Expanding | 681 | 33% | -811.6 | 0.83 | 7/13 | -355.0 |
+| C: + MACD Confirm | 682 | 33% | -863.8 | 0.82 | 4/13 | -371.6 |
+| D: + Volume Spike | 71 | 32% | -156.8 | 0.74 | 3/13 | -81.3 |
+| E: BB + ADX>25 + RSI tight | 374 | 29% | -998.2 | 0.65 | 4/13 | -629.1 |
+
+---
